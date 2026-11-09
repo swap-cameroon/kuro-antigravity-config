@@ -119,6 +119,18 @@ class HuddleTests(unittest.TestCase):
         self.assertIn("e2e-testing", m)
         self.assertIn("Ayuk", m)
 
+    def test_transcript_with_bom_is_still_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "t.jsonl"
+            line = json.dumps({"source": "USER_EXPLICIT", "type": "USER_INPUT",
+                               "content": "ajouter JWT a une API Spring Boot"})
+            path.write_bytes("﻿".encode("utf-8") + line.encode("utf-8"))
+            env = dict(os.environ, PYTHONUTF8="1")
+            env.pop("KURO_CONCERTATION", None)
+            r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"transcriptPath": str(path)}),
+                               capture_output=True, text=True, env=env, encoding="utf-8")
+            self.assertTrue(json.loads(r.stdout).get("injectSteps"))
+
     def test_output_is_short(self):
         m = message(run_hook(["ajouter JWT a une API Spring Boot"]))
         self.assertLess(len(m) // 4, 260, "huddle message must stay cheap (<260 tokens)")

@@ -158,7 +158,7 @@ def load_skills() -> dict[str, set[str]]:
 def last_prompt_and_count(transcript: str) -> tuple[str | None, int]:
     prompt, count = None, 0
     try:
-        with open(transcript, "r", encoding="utf-8") as fh:
+        with open(transcript, "r", encoding="utf-8-sig") as fh:
             for line in fh:
                 if not line.strip():
                     continue
