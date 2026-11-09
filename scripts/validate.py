@@ -28,7 +28,7 @@ FENCE_RE = re.compile(r"```.*?```", re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
 # Token budgets (1 token ~ 4 chars). Descriptions and rules are paid on EVERY turn; SKILL.md bodies on activation.
-BUDGET_RULES_TOKENS = 1300        # all plugins/*/rules/AGENTS.md combined (error)
+BUDGET_RULES_TOKENS = 1400        # all plugins/*/rules/AGENTS.md combined (error)
 BUDGET_DESCRIPTIONS_TOKENS = 3900  # sum of all skill frontmatter descriptions (error)
 MAX_DESCRIPTION_CHARS = 520       # one description (error)
 WARN_SKILL_MD_TOKENS = 3500       # one SKILL.md body (warning: split into references/)

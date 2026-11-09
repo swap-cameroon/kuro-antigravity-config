@@ -56,8 +56,12 @@ A debate is real only if each agent forms its position **before** seeing the oth
 | 4 | Kouam / Kamdem | Implementation in small commits, parallel by area | Compiles, own unit tests pass |
 | 5 | Hayatou | Security review of the diff (threat model, SAST, secrets, dependency, authz) | No open critical/high; no secret in diff or history |
 | 6 | Lukong | Tests mapped to every acceptance criterion; contract + regression | Suite green; every criterion covered; flaky tests fixed, not retried |
+| 6b | Ayuk | E2E suite (`e2e-testing`) run in a real browser against the real running stack, smoke journey first | Primary journeys green; UI and API agree; no unexplained console/network error |
+| 6c | Tchinda | `UAT_REPORT.md` + `BUG-NNN.md`: independent black-box acceptance by hand in the real UI (`exploratory-testing`) | GO with evidence for every primary journey; no open S1. Builders never self-certify |
 | 7 | Endeley | Production image, CI/CD, IaC, observability, runbook, rollback | Pipeline green; non-root pinned image; rollback and alert path documented |
 | 8 | Ngono/Njoya | Docs: README, API spec, runbooks; `PROJECT_STATE.md` updated | A newcomer can run and deploy from the docs |
+
+For user-facing work, gate 6 is **not** passed by backend or API tests alone: 6b and 6c are mandatory. A defect reported by a user or by Tchinda is handled as an incident: reproduce first (Matip), fix at the right layer, add a regression test (Ayuk), re-verify by hand (Tchinda).
 
 A failed gate sends the work back to the **owning role** with concrete findings. Do not paper over a failed gate by relaxing it; if a gate is waived, record who waived it and why in `PROJECT_STATE.md`.
 

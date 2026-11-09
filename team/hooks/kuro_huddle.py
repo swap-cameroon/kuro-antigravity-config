@@ -88,6 +88,8 @@ SYN = {
     "exigences": "requirements", "besoin": "requirements", "spec": "specification", "architecture": "architecture",
     "versions": "version", "livraison": "release", "publication": "release", "apprentissage": "learning",
     "donnee": "data", "pipeline": "pipeline", "stockage": "storage", "cache": "cache", "latence": "latency",
+    "recette": "acceptance uat", "navigateur": "browser", "exploratoire": "exploratory", "bout": "end-to-end e2e",
+    "e2e": "end-to-end e2e", "playwright": "playwright e2e", "ergonomie": "ui usability", "testeur": "test tester",
 }
 
 
@@ -113,7 +115,7 @@ def norm_tokens(text: str) -> set[str]:
     for w in tokens(text):
         res.add(stem(w))
         if w in SYN:
-            res.add(stem(SYN[w]))
+            res.update(stem(part) for part in SYN[w].split())
     return res
 
 
@@ -242,7 +244,7 @@ def build_message(mode: str, first: bool, prompt: str, tier: str, top, people, g
         lines.append("Candidate skills: " + ", ".join(f"{n}" for n, _ in top))
     if people and tier != "SOLO":
         lines.append("Suggested participants: " + ", ".join(people[:maxp])
-                     + (" (+ Njoya to arbitrate, Hayatou/Lukong gates if code changes)" if tier == "FEATURE" else ""))
+                     + (" (+ Njoya to arbitrate; Hayatou/Lukong gates if code changes; Ayuk E2E and Tchinda UAT if user-facing)" if tier == "FEATURE" else ""))
     rounds = int(cfg.get("max_rounds", 2))
     if tier == "SOLO":
         lines.append("SOLO: answer directly after a quick self-check by the most relevant role; no subagents.")

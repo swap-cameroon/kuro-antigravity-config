@@ -109,6 +109,16 @@ class HuddleTests(unittest.TestCase):
                 encoding="utf-8")
             self.assertTrue(call().get("injectSteps"))   # new instruction -> injected again
 
+    def test_acceptance_testing_routes_to_testers(self):
+        m = message(run_hook(["fais la recette de l'application dans le navigateur, parcours utilisateur complet"]))
+        self.assertTrue(any(k in m for k in ("exploratory-testing", "e2e-testing")), m)
+        self.assertTrue(any(p in m for p in ("Tchinda", "Ayuk")), m)
+
+    def test_e2e_playwright_routes_to_ayuk(self):
+        m = message(run_hook(["ecris des tests e2e playwright pour la connexion"]))
+        self.assertIn("e2e-testing", m)
+        self.assertIn("Ayuk", m)
+
     def test_output_is_short(self):
         m = message(run_hook(["ajouter JWT a une API Spring Boot"]))
         self.assertLess(len(m) // 4, 260, "huddle message must stay cheap (<260 tokens)")
