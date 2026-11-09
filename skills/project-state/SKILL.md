@@ -1,6 +1,6 @@
 ---
 name: project-state
-description: Create, resume from, and update PROJECT_STATE.md, the Git-tracked handover file that lets a new session or a human colleague continue a project without re-reading the codebase. Use at the start of a session when PROJECT_STATE.md exists, when starting or onboarding a project, after finishing a milestone or decision, before ending a session, or when asked to hand over, resume, checkpoint or summarize project status.
+description: "Create, resume from and update PROJECT_STATE.md, the Git-tracked handover file that lets a new session or colleague continue without re-reading the codebase. Use at session start when it exists, when starting or onboarding a project, after a milestone or decision, before ending a session, or when asked to hand over, resume or checkpoint."
 license: MIT
 metadata:
   version: "1.0.0"

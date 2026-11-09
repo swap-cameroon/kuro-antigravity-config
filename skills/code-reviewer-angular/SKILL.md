@@ -1,16 +1,6 @@
 ---
 name: code-reviewer-angular
-description: >
-  Angular/TypeScript-specific code review overlay. Extends the universal code-reviewer
-  skill with Angular version-aware rules. Trigger when reviewing Angular components,
-  services, directives, pipes, guards, resolvers, NgRx stores/effects, RxJS streams,
-  Apollo Angular GraphQL, HttpClient calls, SSR (Angular Universal), or any .ts/.html
-  file in an Angular project. Keywords: Angular, standalone, component, NgRx, signal,
-  computed, effect, RxJS, Observable, HttpClient, inject(), OnPush, @if, @for, router,
-  guard, resolver, lazy loading, Angular Material, SSR, hydration. Do NOT trigger for
-  Node.js backend code in the same monorepo (use code-reviewer-node for that) or for
-  plain TypeScript utilities with no Angular imports.
-  (updated 2026-03-28)
+description: "Angular/TypeScript review overlay extending code-reviewer with version-aware rules. Use when reviewing Angular components, services, directives, pipes, guards, resolvers, NgRx, RxJS, HttpClient, SSR or any .ts/.html file in an Angular project. Not for Node.js backend code or plain TypeScript utilities."
 license: MIT
 metadata:
   author: Marwen Amamou | amamoumarwen@gmail.com
@@ -26,6 +16,23 @@ skill's full checklist first, then apply the Angular-specific rules in this file
 1. Run `code-reviewer` (universal pillars: correctness, security, performance, DRY, tests, docs)
 2. Run this overlay (Angular/TypeScript-specific rules below)
 3. Report findings from both in a single unified output
+
+## Load on demand
+
+The core rules in this file always apply. Read a reference below **only when the task needs it**:
+
+| Topic | File |
+| :-- | :-- |
+| Angular-Specific Review Checklist - 🏗️ Components | [references/components.md](references/components.md) |
+| Angular-Specific Review Checklist - ⚡ Signals | [references/signals.md](references/signals.md) |
+| Angular-Specific Review Checklist - 🔁 RxJS | [references/rxjs.md](references/rxjs.md) |
+| Angular-Specific Review Checklist - 🗺️ Routing & Lazy Loading | [references/routing-lazy-loading.md](references/routing-lazy-loading.md) |
+| Angular-Specific Review Checklist - 🌐 HttpClient & REST | [references/httpclient-rest.md](references/httpclient-rest.md) |
+| Angular-Specific Review Checklist - 🔐 Authentication (JWT / OAuth / Guards) | [references/authentication-jwt-oauth-guards.md](references/authentication-jwt-oauth-guards.md) |
+| Angular-Specific Review Checklist - 📦 NgRx | [references/ngrx.md](references/ngrx.md) |
+| Angular-Specific Review Checklist - 🎨 Angular Material | [references/angular-material.md](references/angular-material.md) |
+| Angular-Specific Review Checklist - 🖥️ Angular Universal / SSR | [references/angular-universal-ssr.md](references/angular-universal-ssr.md) |
+| Angular-Specific Review Checklist - 🔵 GraphQL / Apollo Angular (if present) | [references/graphql-apollo-angular-if-present.md](references/graphql-apollo-angular-if-present.md) |
 
 ---
 
@@ -92,254 +99,6 @@ Then apply the version-specific rules below.
 ---
 
 ## Angular-Specific Review Checklist
-
-### 🏗️ Components
-
-- **`OnPush` change detection** — flag every component missing `changeDetection: ChangeDetectionStrategy.OnPush`. This is non-negotiable for performance-conscious teams.
-  ```ts
-  // ❌ Default change detection — scans entire tree
-  @Component({ selector: 'app-user' })
-
-  // ✅ OnPush — only updates when inputs change or signals notify
-  @Component({
-    selector: 'app-user',
-    changeDetection: ChangeDetectionStrategy.OnPush,
-  })
-  ```
-
-- **`inject()` function** — flag constructor injection in new code; use `inject()` exclusively:
-  ```ts
-  // ❌ Constructor injection (legacy)
-  constructor(private readonly userService: UserService) {}
-
-  // ✅ inject() function
-  private readonly userService = inject(UserService);
-  ```
-
-- **Signal inputs/outputs (v17.1+)** — flag `@Input()`/`@Output()` + `EventEmitter` in new components on Angular 17+; prefer `input()`, `output()`, `model()`:
-  ```ts
-  // ❌ Legacy decorator inputs
-  @Input({ required: true }) user!: User;
-  @Output() selected = new EventEmitter<User>();
-
-  // ✅ Signal-based
-  readonly user = input.required<User>();
-  readonly selected = output<User>();
-  ```
-
-- **`subscribe()` in components** — flag direct `.subscribe()` calls in component code; use `toSignal()` or `async` pipe instead:
-  ```ts
-  // ❌ Manual subscription — memory leak risk
-  ngOnInit() {
-    this.userService.getUser().subscribe(u => this.user = u);
-  }
-
-  // ✅ toSignal — auto-cleaned up
-  readonly user = toSignal(this.userService.getUser());
-  ```
-
-- **`@for` track** — flag `@for` loops missing a stable `track` expression:
-  ```html
-  <!-- ❌ Missing track — full DOM re-render on any change -->
-  @for (user of users()) {
-    <app-user-card [user]="user" />
-  }
-
-  <!-- ✅ Stable key -->
-  @for (user of users(); track user.id) {
-    <app-user-card [user]="user" />
-  }
-  ```
-
-- **Template safety** — flag `[innerHTML]` bindings without `DomSanitizer`. Flag `bypassSecurityTrustHtml()` / `bypassSecurityTrustUrl()` without documented justification — these bypass Angular's XSS protection.
-
-- **`CommonModule` imports** — flag `CommonModule` in standalone component imports; use specific imports (`NgIf`, `NgFor`, `AsyncPipe`) or preferably the new control flow syntax instead.
-
-- **NgModule in new features** — flag new `NgModule` creation on Angular 17+; all new code should be standalone.
-
-### ⚡ Signals
-
-- **`signal()` for local state** — flag `BehaviorSubject` used for component or feature-local state where `signal()` would suffice.
-
-- **`computed()` for derived state** — flag computed values re-derived manually in multiple places; extract to `computed()`:
-  ```ts
-  // ❌ Manual derivation, duplicated
-  get activeUsers() { return this.users().filter(u => u.active); }
-
-  // ✅ computed — memoized, reactive
-  readonly activeUsers = computed(() => this.users().filter(u => u.active));
-  ```
-
-- **`effect()` side effects** — flag `effect()` used to derive or transform state (that's `computed()`'s job). `effect()` is for side effects only (logging, localStorage, external calls).
-
-- **`signal.asReadonly()`** — flag writable signals exposed publicly from services; expose `asReadonly()`:
-  ```ts
-  // ❌ Writable signal leaked — consumers can mutate
-  readonly users = signal<User[]>([]);
-
-  // ✅ Expose read-only; mutate only through service methods
-  private readonly _users = signal<User[]>([]);
-  readonly users = this._users.asReadonly();
-  ```
-
-- **`toSignal()` with `initialValue`** — flag `toSignal()` calls on Observables that may not emit immediately without an `initialValue` or `{ requireSync: true }` — results in `undefined` signal until first emission.
-
-- **`linkedSignal()` (v19+)** — flag complex `computed()` + `effect()` combinations that reset a signal when another changes; `linkedSignal()` is the cleaner pattern.
-
-### 🔁 RxJS
-
-**Rule of thumb: RxJS for async/events, Signals for state. Convert at component boundary with `toSignal()`.**
-
-- **Unsubscribed observables** — flag `.subscribe()` without cleanup. Acceptable patterns: `takeUntilDestroyed()`, `async` pipe, `toSignal()`. Flag `ngOnDestroy` + manual `Subscription` arrays in new code — use `takeUntilDestroyed(this.destroyRef)` instead:
-  ```ts
-  // ❌ Manual unsubscribe boilerplate
-  private sub = new Subscription();
-  ngOnInit() { this.sub.add(obs$.subscribe(...)); }
-  ngOnDestroy() { this.sub.unsubscribe(); }
-
-  // ✅ takeUntilDestroyed
-  obs$.pipe(takeUntilDestroyed()).subscribe(...);
-  ```
-
-- **`switchMap` for cancellable requests** — flag `mergeMap` or `concatMap` on search/autocomplete streams where only the latest result matters.
-
-- **Error handling** — flag Observable chains missing `catchError` — unhandled errors complete the stream and break the UI.
-
-- **`BehaviorSubject` as state** — flag `BehaviorSubject` used for state that is: (a) local to a component, (b) synchronous, (c) not shared across features. Replace with `signal()`.
-
-- **Nested subscriptions** — flag `.subscribe()` inside another `.subscribe()` — use `switchMap`, `mergeMap`, or `combineLatest` instead.
-
-### 🗺️ Routing & Lazy Loading
-
-- **Lazy loading** — flag `loadComponent` / `loadChildren` not used for feature routes. Every feature route should be lazy-loaded:
-  ```ts
-  // ❌ Eager — entire module loaded upfront
-  { path: 'users', component: UsersComponent }
-
-  // ✅ Lazy — loaded on demand
-  { path: 'users', loadComponent: () => import('./users/users.component') }
-  ```
-
-- **Functional guards** — flag class-based `CanActivate` / `CanDeactivate` guards in Angular 15+ projects; use functional guards:
-  ```ts
-  // ❌ Class-based guard (legacy)
-  @Injectable()
-  export class AuthGuard implements CanActivate { ... }
-
-  // ✅ Functional guard
-  export const authGuard: CanActivateFn = (route, state) => {
-    return inject(AuthService).isAuthenticated()
-      ? true
-      : inject(Router).createUrlTree(['/login']);
-  };
-  ```
-
-- **`input.fromRoute()` (v17.1+)** — flag components using `ActivatedRoute.snapshot.params` or `paramMap` subscriptions; prefer `input.fromRoute()` where route inputs are enabled.
-
-- **`withComponentInputBinding()`** — flag projects not enabling route component input binding in `provideRouter()` — required for `input.fromRoute()` to work.
-
-- **Route prefetching** — flag critical user flows without `prefetch` strategy on lazy routes.
-
-### 🌐 HttpClient & REST
-
-- **Services, not components** — flag `HttpClient` injected directly in a component; all HTTP calls belong in services.
-
-- **`httpResource()` (v19.2+)** — acceptable for component-level reactive data fetching. Flag it inside services (use `HttpClient` there).
-
-- **Error handling** — flag HTTP calls without `catchError` or error state handling in the UI.
-
-- **Typed HTTP responses** — flag `http.get('/api/users')` without a type parameter; always use `http.get<User[]>('/api/users')`.
-
-- **Interceptors** — flag class-based `HttpInterceptor` in Angular 15+ projects; use functional interceptors:
-  ```ts
-  // ✅ Functional interceptor
-  export const authInterceptor: HttpInterceptorFn = (req, next) => {
-    const token = inject(AuthService).getToken();
-    return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
-  };
-  ```
-
-- **Retry logic** — flag API calls that should retry on transient failures (network errors) without `retry()` or `retryWhen()`.
-
-### 🔐 Authentication (JWT / OAuth / Guards)
-
-- **Route guards** — flag protected routes missing `canActivate` with an auth guard.
-- **Token storage** — flag JWT stored in `localStorage`; prefer `httpOnly` cookies or `sessionStorage` with XSS mitigations.
-- **Token refresh** — flag implementations that don't handle `401` responses with token refresh logic in an interceptor.
-- **`isAuthenticated` as signal** — flag auth state exposed as Observable where `signal()` + `toSignal()` would be cleaner for template consumption.
-- **Role-based access** — flag guards checking only authentication, not authorization (roles/permissions) for admin or privileged routes.
-- **OAuth `state` parameter** — flag OAuth redirect flows missing CSRF state validation.
-
-### 📦 NgRx
-
-- **Tiered state rule** — flag NgRx used for purely local component state; use `signal()` instead. NgRx is for: global state, cross-feature shared data, and complex side effects.
-
-- **NgRx Signal Store (v17+)** — flag class-based `@ngrx/store` for new features in modern Angular apps; prefer `signalStore()`:
-  ```ts
-  // ✅ NgRx Signal Store pattern
-  export const UsersStore = signalStore(
-    { providedIn: 'root' },
-    withState(initialState),
-    withComputed(({ users }) => ({
-      activeUsers: computed(() => users().filter(u => u.active))
-    })),
-    withMethods((store, usersService = inject(UsersService)) => ({
-      loadUsers: rxMethod<void>(
-        pipe(
-          switchMap(() => usersService.getAll()),
-          tapResponse({
-            next: users => patchState(store, { users }),
-            error: console.error
-          })
-        )
-      )
-    }))
-  );
-  ```
-
-- **Effects** — flag side effects (HTTP calls, routing, notifications) placed directly in reducers or components; use NgRx Effects or `withMethods` + `rxMethod`.
-- **Selectors** — flag repeated `store.select()` calls for the same data; extract to reusable selectors.
-- **`patchState`** — flag direct state mutation attempts; always use `patchState()` in Signal Store methods.
-
-### 🎨 Angular Material
-
-- **Theming** — flag direct color values in component styles that should use Material theme tokens.
-- **`MatFormFieldModule`** — flag form fields missing proper `appearance` attribute.
-- **Accessibility** — flag `mat-icon` buttons missing `matTooltip` or `aria-label`.
-- **Module vs standalone imports** — flag importing entire `MatButtonModule` where only `MatButton` directive is needed (standalone tree-shaking).
-
-### 🖥️ Angular Universal / SSR
-
-- **`isPlatformBrowser()`** — flag direct `window`, `document`, or `localStorage` access without platform check; these crash during SSR:
-  ```ts
-  // ❌ Crashes on server
-  ngOnInit() { localStorage.setItem('key', 'value'); }
-
-  // ✅ Platform-safe
-  ngOnInit() {
-    if (isPlatformBrowser(this.platformId)) {
-      localStorage.setItem('key', 'value');
-    }
-  }
-  ```
-
-- **`afterNextRender()` / `afterRender()`** — flag `ngAfterViewInit` used for browser-only DOM operations in SSR apps; use `afterNextRender()` (runs only in browser).
-
-- **`TransferState`** — flag SSR apps making the same HTTP request on both server and client; use `TransferState` or `httpResource()` to cache server-fetched data.
-
-- **Incremental hydration (v19+)** — flag large, below-the-fold components not using `@defer` with hydration triggers.
-
-- **Event replay** — flag SSR apps on v18+ not enabling `withEventReplay()` in `provideClientHydration()` — user interactions before hydration are lost.
-
-### 🔵 GraphQL / Apollo Angular (if present)
-
-- **Typed queries** — flag Apollo `useQuery` / `gql` calls without generated TypeScript types; use `graphql-codegen`.
-- **`watchQuery` vs `query`** — flag `query()` used where the UI needs live cache updates; use `watchQuery()`.
-- **Loading/error states** — flag components using Apollo without handling `loading` and `error` states in the template.
-- **`fetchPolicy`** — flag missing `fetchPolicy` on queries where stale data is a concern.
-- **Mutations and cache** — flag mutations not updating the Apollo cache (`update` function or `refetchQueries`) when they modify list data.
-
----
 
 ## Anti-Patterns Quick Reference
 

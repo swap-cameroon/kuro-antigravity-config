@@ -11,7 +11,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate skills, roster, links, catalog
-        run: python scripts/validate.py
+        run: python scripts/validate.py --strict --report
       - name: Token-saver tests (scripts, not unittest)
         working-directory: skills/token-saver
         env:

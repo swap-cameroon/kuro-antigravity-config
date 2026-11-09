@@ -6,13 +6,27 @@ A portable, versioned setup for **Google Antigravity (`agy`)**: a 7-role enginee
 
 | Piece | Where | Purpose |
 | :-- | :-- | :-- |
-| Team rules (always on, ~35 lines) | `plugins/team-kuro/` | Roles, routing, lifecycle gates, honesty rules |
-| Token rules (always on, ~15 lines) | `plugins/token-optimization/` | Output/read/command discipline |
+| Team rules (always on, 24 lines) | `plugins/team-kuro/` | Roles, routing, lifecycle gates, honesty rules |
+| Token rules (always on, 11 lines) | `plugins/token-optimization/` | Output/read/command discipline |
 | Skills (on demand) | `skills/` | 35 domain playbooks - see [docs/SKILLS.md](docs/SKILLS.md) |
 | Team roster | `team/roster.json` | Single source of truth: who owns which skill, deliverable and gate |
 | Handover | `skills/project-state/` | `PROJECT_STATE.md` template + resume/update protocol |
 
 Design rule: **always-loaded files stay tiny; detail lives in skills** that are read only when the task needs them.
+
+## Performance budget (measured, enforced in CI)
+
+Estimated with 1 token ~ 4 characters (`python scripts/validate.py --report`):
+
+| | Initial import | Now |
+| :-- | --: | --: |
+| Always-on rules (every turn) | ~2,250 | ~1,000 |
+| Skill names + descriptions (every turn, if your host lists them) | ~3,880 | ~2,860 |
+| **Baseline per turn** | **~6,130** | **~3,860 (-37%)** |
+| Heaviest SKILL.md on activation | ~8,070 | ~5,810 |
+| Five heaviest SKILL.md combined | ~32,000 | ~20,600 |
+
+How: oversized skills (`secure-by-design-coding`, `angular-structure`, `angular-security`, `security-auditor`, `perf`, `code-reviewer-angular`) keep their core rules in `SKILL.md` and expose the rest as `references/*.md` behind a "Load on demand" index; content is moved verbatim, never rewritten. Descriptions were tightened while keeping their routing triggers. CI fails if the always-on rules exceed 1,100 tokens, descriptions exceed 3,000 tokens in total, or a description exceeds 520 characters, and warns when a `SKILL.md` exceeds ~3,500 tokens.
 
 ## Team
 
@@ -65,6 +79,8 @@ Every active project keeps a Git-tracked `PROJECT_STATE.md` ([template](skills/p
 ```bash
 python scripts/validate.py               # frontmatter, name==dir, links, roster, JSON, counts, catalog
 python scripts/validate.py --write-catalog   # regenerate docs/SKILLS.md after adding a skill
+python scripts/validate.py --report          # token budget report
+python scripts/split_skill.py <skill> --keep "Section A" --deep "Big section" [--dry-run]   # split an oversized SKILL.md
 ```
 CI runs the same check on every push/PR (`.github/workflows/validate.yml`).
 

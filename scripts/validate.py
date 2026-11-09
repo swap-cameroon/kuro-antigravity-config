@@ -7,9 +7,10 @@ Checks (errors fail the run, warnings do not unless --strict):
   * team/roster.json only references skills that exist, and every skill is owned by someone
   * JSON files parse, plugin.json files have the required keys
   * the install scripts and README skill count agree with the real number of skills
+  * token budgets: always-on rules, total skill descriptions, per-description and per-SKILL.md size
   * docs/SKILLS.md is up to date (use --write-catalog to regenerate it)
 
-Usage:  python scripts/validate.py [--strict] [--write-catalog]
+Usage:  python scripts/validate.py [--strict] [--write-catalog] [--report]
 Only the standard library is used, so it runs anywhere (CI, Windows, macOS, Linux).
 """
 from __future__ import annotations
@@ -25,6 +26,19 @@ SKILLS = ROOT / "skills"
 LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE_RE = re.compile(r"```.*?```", re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+# Token budgets (1 token ~ 4 chars). Descriptions and rules are paid on EVERY turn; SKILL.md bodies on activation.
+BUDGET_RULES_TOKENS = 1100        # all plugins/*/rules/AGENTS.md combined (error)
+BUDGET_DESCRIPTIONS_TOKENS = 3000  # sum of all skill frontmatter descriptions (error)
+MAX_DESCRIPTION_CHARS = 520       # one description (error)
+WARN_SKILL_MD_TOKENS = 3500       # one SKILL.md body (warning: split into references/)
+# Authored as a single workflow with their own progressive disclosure in sibling folders; not split mechanically.
+SIZE_EXEMPT = {"system-design-architect", "backend-performance-review"}
+
+
+def tokens(text: str) -> int:
+    return (len(text) + 3) // 4
+
 
 errors: list[str] = []
 warnings: list[str] = []
@@ -95,6 +109,34 @@ def check_links() -> None:
                 (err if md.name == "SKILL.md" else warn)(
                     f"{md.relative_to(ROOT)}: broken relative link -> {target}"
                 )
+
+
+def check_budgets(meta: dict[str, dict[str, str]], report: bool) -> None:
+    rules = {p: tokens(p.read_text(encoding="utf-8")) for p in ROOT.glob("plugins/*/rules/AGENTS.md")}
+    rules_total = sum(rules.values())
+    desc_total = sum(tokens(m.get("description", "")) + tokens(m.get("name", "")) for m in meta.values())
+    if rules_total > BUDGET_RULES_TOKENS:
+        err(f"always-on rules cost ~{rules_total} tokens/turn (budget {BUDGET_RULES_TOKENS}); move detail into a skill")
+    if desc_total > BUDGET_DESCRIPTIONS_TOKENS:
+        err(f"skill descriptions cost ~{desc_total} tokens/turn (budget {BUDGET_DESCRIPTIONS_TOKENS}); shorten descriptions")
+    sizes = {}
+    for n, m in meta.items():
+        d = m.get("description", "")
+        if len(d.strip('"')) > MAX_DESCRIPTION_CHARS:
+            err(f"skills/{n}: description is {len(d)} chars (max {MAX_DESCRIPTION_CHARS})")
+        body = (SKILLS / n / "SKILL.md").read_text(encoding="utf-8", errors="replace")
+        sizes[n] = tokens(body)
+        if sizes[n] > WARN_SKILL_MD_TOKENS and n not in SIZE_EXEMPT:
+            warn(f"skills/{n}/SKILL.md is ~{sizes[n]} tokens; split it (python scripts/split_skill.py {n} --keep ...)")
+    if report:
+        print("== Token budget report (1 token ~ 4 chars) ==")
+        print(f"always-on rules      : ~{rules_total:>5} tokens/turn  (budget {BUDGET_RULES_TOKENS})")
+        print(f"skill descriptions   : ~{desc_total:>5} tokens/turn  (budget {BUDGET_DESCRIPTIONS_TOKENS})")
+        print(f"baseline per turn    : ~{rules_total + desc_total:>5} tokens")
+        print("heaviest SKILL.md on activation:")
+        for n, s in sorted(sizes.items(), key=lambda x: -x[1])[:8]:
+            print(f"  {s:>6}  {n}")
+        print()
 
 
 def check_roster(skill_names: set[str]) -> dict:
@@ -188,6 +230,7 @@ def check_counts(n_skills: int) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    ap.add_argument("--report", action="store_true", help="print the token budget report")
     ap.add_argument("--write-catalog", action="store_true", help="regenerate docs/SKILLS.md")
     args = ap.parse_args()
 
@@ -196,6 +239,7 @@ def main() -> int:
     roster = check_roster(set(meta))
     check_json_and_plugins()
     check_counts(len(meta))
+    check_budgets(meta, args.report)
 
     catalog = build_catalog(meta, roster)
     cat_file = ROOT / "docs" / "SKILLS.md"

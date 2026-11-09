@@ -1,6 +1,6 @@
 ---
 name: spec-miner
-description: "Reverse-engineering specialist that extracts specifications from existing codebases. Use when working with legacy or undocumented systems, inherited projects, or old codebases with no documentation. Invoke to map code dependencies, generate API documentation from source, identify undocumented business logic, figure out what code does, or create architecture documentation from implementation. Trigger phrases: reverse engineer, old codebase, no docs, no documentation, figure out how this works, inherited project, legacy analysis, code archaeology, undocumented features."
+description: "Reverse-engineers specifications from existing code: dependency maps, API docs from source, undocumented business logic, architecture documentation. Use for legacy or undocumented systems, inherited projects, 'no docs', 'figure out how this works', 'reverse engineer', 'code archaeology'."
 license: MIT
 allowed-tools: Read Grep Glob
 metadata:

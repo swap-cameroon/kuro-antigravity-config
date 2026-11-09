@@ -1,10 +1,6 @@
 ---
 name: llm-sast-scanner
-description: >
-  General-purpose Static Application Security Testing (SAST) skill for code vulnerability analysis.
-  Trigger when the user asks to: "analyze code for vulnerabilities", "review code security", "find security bugs",
-  "do a SAST scan", "check for [vulnerability type] in code", "audit source code", or requests a security
-  code review of any language or framework. Covers 34 vulnerability classes across web, API, auth, mobile, and logic layers.
+description: "General-purpose static application security testing (SAST) for any language or framework, covering 34 vulnerability classes across web, API, auth, mobile and logic layers. Use for 'analyze code for vulnerabilities', 'find security bugs', 'do a SAST scan', 'audit source code', 'check for [vulnerability type]', or a security code review."
 metadata:
   version: "1.3.1"
   domain: application-security

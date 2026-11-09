@@ -1,11 +1,6 @@
 ---
 name: security-audit
-description: >
-  Master orchestrator skill for comprehensive security auditing. Auto-detects the project's technology
-  stack and selectively invokes applicable security scanning skills. Produces a unified report with
-  context-aware remediation. Trigger when the user asks for: "security audit", "full security scan",
-  "comprehensive vulnerability assessment", "scan this project for security issues", "run all security
-  checks", "full pentest", or any request for a broad, multi-dimensional security review.
+description: "Orchestrator for comprehensive security audits: auto-detects the stack, runs the applicable scanning skills and produces one unified report with remediation. Use for 'security audit', 'full security scan', 'comprehensive vulnerability assessment', 'run all security checks', or any broad multi-dimensional security review."
 metadata:
   version: "1.0.0"
   domain: application-security

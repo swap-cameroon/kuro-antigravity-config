@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-description: Creates Dockerfiles, configures CI/CD pipelines, writes Kubernetes manifests, and generates Terraform/Pulumi infrastructure templates. Handles deployment automation, GitOps configuration, incident response runbooks, and internal developer platform tooling. Use when setting up CI/CD pipelines, containerizing applications, managing infrastructure as code, deploying to Kubernetes clusters, configuring cloud platforms, automating releases, or responding to production incidents. Invoke for pipelines, Docker, Kubernetes, GitOps, Terraform, GitHub Actions, on-call, or platform engineering.
+description: "Creates Dockerfiles, CI/CD pipelines, Kubernetes manifests and Terraform/Pulumi IaC; handles deployment automation, GitOps, runbooks and incident response. Use for pipelines, Docker, Kubernetes, GitHub Actions, containerizing apps, infrastructure as code, releases, on-call and platform engineering."
 license: MIT
 metadata:
   author: https://github.com/Jeffallan

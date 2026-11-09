@@ -1,6 +1,6 @@
 ---
 name: ui-design-a11y
-description: Build and review user interfaces for accessibility (WCAG 2.2 AA), responsive layout, design-token consistency, Tailwind CSS usage, motion and performance, framework-agnostic with Angular examples. Use when creating or reviewing components, forms, navigation, dialogs, tables, themes, dark mode, animations, or when asked about accessibility, ARIA, keyboard support, contrast, responsive design or UI polish.
+description: "Build and review UIs for accessibility (WCAG 2.2 AA), responsive layout, design tokens, Tailwind, motion and perceived performance; framework-agnostic with Angular examples. Use for components, forms, navigation, dialogs, themes, dark mode, animations, ARIA, keyboard support, contrast or UI polish."
 license: MIT
 metadata:
   version: "1.0.0"

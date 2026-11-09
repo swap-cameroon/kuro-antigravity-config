@@ -1,16 +1,6 @@
 ---
 name: code-reviewer
-description: >
-  Conducts structured, senior-level code reviews with categorized, actionable feedback —
-  and fixes issues before presenting output to the user. Trigger when user says "review
-  this code", "check my PR", "look over this function", "give me feedback on this
-  implementation", "audit this before deploy", "simplify this", or "review these changes".
-  Covers correctness, security (OWASP 2025), performance, maintainability, DRY violations,
-  test coverage, and technical debt. The review loop runs before output is shown — the user
-  receives the second draft, not the first. Produces output with blocking issues clearly
-  separated from suggestions. Do NOT trigger for architecture-only discussions (use
-  architect-reviewer) or security-only audits (use security-auditor).
-  (updated 2026-03-28)
+description: "Structured senior-level code review with categorized, actionable feedback; blocking issues are separated from suggestions and fixed before output is shown. Use for 'review this code', 'check my PR', 'give me feedback', 'audit before deploy', 'review these changes'. Covers correctness, security, performance, maintainability, tests and debt. Not for architecture-only discussions."
 license: MIT
 metadata:
   author: Marwen Amamou | amamoumarwen@gmail.com

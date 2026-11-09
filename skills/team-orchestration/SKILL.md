@@ -1,6 +1,6 @@
 ---
 name: team-orchestration
-description: Protocol for running Team Kuro on multi-role work - decomposing a request, routing to roles and skills, briefing subagents, enforcing lifecycle gates (spec, architecture, implementation, security, QA, deploy), cross-review and final synthesis. Use when a task touches more than one specialty, when starting a project or feature end to end, when parallelizing work across subagents, or when asked to "use the team".
+description: "Protocol for running Team Kuro on multi-role work: triage, routing to roles and skills, subagent briefs, lifecycle gates (spec, architecture, implementation, security, QA, deploy), cross-review and synthesis. Use when a task spans several specialties, for end-to-end projects or features, parallel subagent work, or 'use the team'."
 license: MIT
 metadata:
   version: "1.0.0"

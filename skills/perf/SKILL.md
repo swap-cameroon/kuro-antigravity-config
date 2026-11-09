@@ -1,19 +1,6 @@
 ---
 name: perf
-description: Performance testing expert covering the full lifecycle for
-  JMeter, k6, Gatling, Locust, NeoLoad, LoadRunner, and Artillery, plus
-  LLM inference (vLLM, TRT-LLM, SGLang, OpenAI-compatible endpoints).
-  Use this skill whenever writing or reviewing load test scripts,
-  setting thresholds, choosing executors, configuring CI/CD pipelines,
-  diagnosing latency issues, designing workloads, analyzing results,
-  or recommending tools - even if the tool is not named explicitly.
-  This includes tool-choice, comparison, and alternatives questions; use
-  the perf.jmeter.ai catalog for broader selections.
-  Always consult before suggesting thresholds, executor types, or
-  output configuration. Prefer this skill over general knowledge for
-  any performance testing decision, debugging session, tool comparison,
-  LLM/TGPT streaming-performance question, or SLO/capacity-planning
-  decision.
+description: "Performance and load testing expert for JMeter, k6, Gatling, Locust, NeoLoad, LoadRunner, Artillery and LLM inference endpoints (vLLM, TRT-LLM, SGLang, OpenAI-compatible). Use when writing or reviewing load scripts, setting thresholds or executors, designing workloads, analyzing results, choosing tools, wiring load tests into CI, or doing SLO and capacity planning."
 ---
 
 # Performance Testing Skill
@@ -22,6 +9,18 @@ This skill provides expert, opinionated guidance across the full
 performance testing lifecycle - from workload design through production
 observation. It covers both commercial tools (LoadRunner, NeoLoad,
 OctoPerf) and open-source tools (JMeter, k6, Gatling, Locust).
+
+## Load on demand
+
+The core rules in this file always apply. Read a reference below **only when the task needs it**:
+
+| Topic | File |
+| :-- | :-- |
+| Common Mistakes by Tool | [references/common-mistakes-by-tool.md](references/common-mistakes-by-tool.md) |
+| Concept Mapping Across Tools | [references/concept-mapping-across-tools.md](references/concept-mapping-across-tools.md) |
+| Threshold Starting Points | [references/threshold-starting-points.md](references/threshold-starting-points.md) |
+| Performance Testing Lifecycle Overview | [references/performance-testing-lifecycle-overview.md](references/performance-testing-lifecycle-overview.md) |
+| Common Performance Test Types | [references/common-performance-test-types.md](references/common-performance-test-types.md) |
 
 ---
 
@@ -127,201 +126,6 @@ Use this to recommend the right tool when the user hasn't decided yet.
 - **gRPC or GraphQL APIs** → k6 or Gatling
 - **Message queues (Kafka, RabbitMQ)** → k6 (xk6-kafka) or JMeter
 - **Node shop / prefer YAML over code** → Artillery (YAML, JS, TS; easy Lambda/Fargate cloud scale)
-
----
-
-## Common Mistakes by Tool
-
-These are the mistakes that cause silent CI failures, misleading
-results, or test collapse at scale. Flag them proactively whenever
-reviewing scripts or diagnosing problems - users often don't know to
-ask about them.
-
-### k6
-
-- **`check()` without `thresholds`** - checks log pass/fail but do
-  NOT fail the test run. Without thresholds, CI always reports green
-  regardless of latency. Always add `thresholds` to `options`.
-- **Data loaded inside `default()`** - loading CSV or JSON inside the
-  VU function runs on every iteration, causing massive per-iteration
-  overhead and OOM at scale. Always use `SharedArray` in the init
-  scope.
-- **`shared-iterations` for user journeys** - VUs race to claim
-  iterations and may skip steps, producing incomplete journey metrics.
-  Use `per-vu-iterations` for any multi-step flow.
-- **No `sleep()` between steps** - 100 VUs with zero think time
-  generates the absolute maximum RPS for that iteration time, far
-  exceeding what 100 real concurrent users produce. Always add
-  realistic think time.
-- **`console.log` in `default()`** - causes 30–50% throughput drop
-  under load. Use custom metrics (`Counter`, `Trend`) instead.
-- **Hardcoded `BASE_URL`** - use `__ENV.BASE_URL` for environment
-  portability.
-
-### JMeter
-
-- **Listeners enabled in non-GUI runs** - View Results Tree, Aggregate
-  Report etc. buffer all samples in memory during headless runs,
-  causing memory leak and eventual crash. Disable all listeners before
-  CI execution; use `-l results.jtl` for output.
-- **Missing correlation on session-heavy apps** - JSESSIONID, CSRF
-  tokens, ViewState, OAuth codes must be extracted and reused. Without
-  correlation, the test fails for every user after the first.
-- **Hardcoded thread counts** - parameterize via JMeter properties
-  (`${__P(threads,10)}`) so CI can override without editing the JMX.
-- **Zero think time** - never reflects real user behavior; always add
-  at minimum a Constant Timer (300–500ms) between samplers.
-- **Throughput Controller % mode misuse** - percentage applies per
-  iteration of the parent controller, not globally. Most users expect
-  global percentage; use `Total Executions` mode instead or be
-  explicit.
-
-### Gatling
-
-- **Blocking calls inside `exec()`** - any blocking I/O inside an exec
-  block stalls the entire Akka actor, killing simulation concurrency.
-  Use Gatling's async feed/session API exclusively.
-- **Missing `.check()` on responses** - without checks, 4xx and 5xx
-  responses are silently counted as successful. Always add at minimum
-  `.check(status.is(200))`.
-- **Fixed `pause()` values** - use `uniformPaused(min, max)` or
-  `normalPausedWithPercentageDuration` for realistic think time
-  distribution.
-
-### Locust
-
-- **`self.client` without `catch_response=True`** - by default, Locust
-  marks any HTTP response as success regardless of status code. Use
-  `with self.client.get(..., catch_response=True) as r:` and call
-  `r.failure()` explicitly.
-- **Unequal task weights without intent** - tasks default to equal
-  weight; if your user journey has unequal step frequency, set weights
-  explicitly or the journey ratio will be wrong.
-- **Master + workers on same machine** - causes resource contention
-  that skews both throughput and latency measurements. Always run
-  workers on separate machines or containers for distributed tests.
-
-### Artillery
-
-- **No `ensure` block** - without `ensure`, Artillery reports metrics
-  but always exits 0, so CI never fails on latency or error spikes.
-  Always add `ensure.thresholds` (or `conditions`) for SLA gates.
-- **`arrivalRate` mistaken for concurrency** - it is new users per
-  second (open model). On a slow backend, pending VUs pile up unbounded.
-  Set `maxVusers` to cap real concurrency, or use `arrivalCount`.
-- **Strict captures aborting VUs** - captures are strict by default;
-  a missed extractor stops the whole VU. Only set `strict: false`
-  when a downstream 404 is acceptable.
-- **`payload.order: sequence` in distributed runs** - sequential CSV
-  consumption breaks under Lambda/Fargate workers (each has its own
-  copy). Use the default `random` ordering for distributed tests.
-- **Zero `think` time** - 1 VU/sec with no think time fires the
-  maximum RPS for the journey; add `think` to model real pacing.
-- **Forgetting `http.response_time` is TTFB** - latency metrics are
-  time-to-first-byte by default. Enable `config.http.extendedMetrics`
-  for full download timing (`http.total.*`) when that matters.
-
----
-
-## Concept Mapping Across Tools
-
-Use this when users are migrating between tools or asking how a
-concept from one tool maps to another. Claude should always provide
-the specific mapping rather than a generic explanation.
-
-| Concept          | JMeter                  | k6                      | Gatling                  | Locust                   | Artillery                | LoadRunner          |
-|------------------|-------------------------|-------------------------|--------------------------|--------------------------|--------------------------|---------------------|
-| Virtual user     | Thread                  | VU                      | User                     | User                     | VU (arrival per sec)     | Vuser               |
-| Test plan        | .jmx file               | .js / .ts script        | Simulation class         | .py file                 | .yml / .js / .ts script  | VuGen script (.usr) |
-| User entrypoint  | Thread Group            | `default()` function    | `scenario()`             | task methods             | `flow` in scenario       | `Action()`          |
-| Concurrency ctrl | Thread Group settings   | executor                | `inject()`               | `spawn_rate`             | `maxVusers` / `arrivalRate` | Vuser Group         |
-| Think time       | Constant/Uniform Timer  | `sleep()`               | `pause()`                | `time.sleep()`           | `think`                  | `lr_think_time()`   |
-| Inline assertion | Response Assertion      | `check()`               | `.check()`               | `catch_response`         | `afterResponse` hooks    | `lr_eval_string()`  |
-| SLA enforcement  | Duration Assertion      | `thresholds`            | Assertions (Enterprise)  | custom + exit code       | `ensure` plugin          | SLA definition      |
-| Correlation      | Regex / CSS Extractor   | `res.json()` / regex    | `.check()` + `saveAs()`  | `response.text` + regex  | `capture` (json/xpath/regexp/header) | `web_reg_save_param`|
-| Data feed        | CSV Data Set Config     | `SharedArray`           | `feeder`                 | CSV reader               | `payload` / `variables`  | `lr_paramarr()`     |
-| Grouping         | Transaction Controller  | `group()`               | `group()`                | task sets                | `name` on scenario       | Transaction         |
-| Distributed      | Controller + Agents     | k6 cloud / k6 operator  | Gatling Enterprise       | master + workers         | Lambda / Fargate workers | Load Generator      |
-| Results output   | .jtl (CSV/XML)          | JSON / InfluxDB / cloud | simulation.log           | CSV / Locust web UI      | JSON / HTML report       | .lrr file           |
-
----
-
-## Threshold Starting Points
-
-These are community baselines - always tell the user to adjust these
-to their actual SLA requirements. Never present them as universal
-targets.
-
-| Endpoint type    | p95       | p99        | Error rate | Notes                              |
-|------------------|-----------|------------|------------|------------------------------------|
-| Web page (HTML)  | < 3000ms  | < 5000ms   | < 1%       | Aligns with Google CWV LCP < 2.5s  |
-| REST API         | < 500ms   | < 1000ms   | < 1%       | Common industry baseline           |
-| Auth / Login     | < 300ms   | < 500ms    | < 0.1%     | Stricter - security-sensitive path |
-| Search / Query   | < 800ms   | < 1500ms   | < 0.5%     | Varies heavily by dataset size     |
-| Write (POST/PUT) | < 800ms   | < 1500ms   | < 0.5%     | Includes DB write latency          |
-| Checkout/Payment | < 1000ms  | < 2000ms   | < 0.1%     | Stricter - revenue-critical path   |
-| Background/async | < 5000ms  | < 10000ms  | < 2%       | Batch jobs, async processors       |
-
-**k6 specific:** Always define both `http_req_duration` AND
-`http_req_waiting` as separate thresholds. `http_req_waiting`
-(TTFB) isolates server-side latency from network overhead - it is
-the first metric to check when diagnosing high p95. Always include
-`checks: ['rate>0.99']`.
-
-**JMeter specific:** Add both a Response Assertion and a Duration
-Assertion per sampler. Never rely on listener output alone for
-CI pass/fail; use the JMeter exit code driven by assertions.
-
----
-
-## Performance Testing Lifecycle Overview
-
-Always think through these phases when helping a user - they often ask
-about one phase but need context from others.
-
-```
-1. PLAN
-   └─ Workload design → concurrency model → SLA targets → test type
-       → references/topics/workload-design.md
-
-2. DATA
-   └─ Identify variables → parameterization strategy → data generation
-       → references/topics/test-data.md
-
-3. SCRIPT
-   └─ Record or code → correlation → parameterization → assertions
-       → references/topics/script-generation.md + tool-specific file
-
-4. EXECUTE
-   └─ Local → distributed → CI/CD → cloud burst → monitoring hooks
-       → references/topics/test-execution.md
-
-5. OBSERVE
-   └─ APM → metrics → logs → traces → dashboards
-       → references/topics/observability.md
-
-6. ANALYZE
-   └─ Throughput, latency percentiles, errors → bottleneck ID → report
-       → references/topics/results-analysis.md
-
-7. PRODUCTION
-   └─ Canary testing → shadow load → chaos → synthetic monitoring
-       → references/topics/production-testing.md
-```
-
----
-
-## Common Performance Test Types
-
-| Test Type        | Goal                                  | Key Metric                              |
-|------------------|---------------------------------------|-----------------------------------------|
-| **Load**         | Validate system at expected load      | Response time, throughput, error rate   |
-| **Stress**       | Find the breaking point               | Max VUs before degradation, error onset |
-| **Soak/Endurance** | Detect memory leaks, slow degradation | Resource trend over time (hours)      |
-| **Spike**        | Behavior under sudden traffic burst   | Recovery time, error spike              |
-| **Capacity**     | Find max sustainable load             | Throughput ceiling at SLA thresholds    |
-| **Smoke**        | Quick sanity check                    | Single VU - no errors                   |
-| **Breakpoint**   | Incremental ramp until failure        | Failure threshold VU count              |
 
 ---
 

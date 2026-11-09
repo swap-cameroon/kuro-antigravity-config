@@ -1,10 +1,6 @@
 ---
 name: remediation-validator
-description: >
-  Remediation validation skill that re-runs targeted scans after fixes to confirm vulnerabilities are resolved
-  and detect regressions. Trigger when the user asks to: "verify a fix", "validate remediation", "confirm a
-  vulnerability is resolved", "re-scan after fixing", "check if a patch works", "did my fix work",
-  "validate the security fix", "re-test after remediation", or "check for regressions after the fix".
+description: "Re-runs targeted scans after fixes to confirm vulnerabilities are resolved and detect regressions. Use for 'verify a fix', 'validate remediation', 'did my fix work', 're-scan after fixing', 'check for regressions after the patch'."
 metadata:
   version: "1.0.0"
   domain: application-security
