@@ -1,0 +1,253 @@
+{
+  "skill_name": "perf",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm using k6 checks to validate all my API responses. My CI pipeline shows all tests passing but users are complaining about slowness. What am I missing?",
+      "expected_output": "Identifies that checks do not fail the test run - thresholds are required for CI enforcement. Provides a concrete threshold example.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "checks-vs-thresholds-distinction",
+          "text": "Explicitly states that checks do NOT produce a non-zero exit code and cannot fail a CI pipeline"
+        },
+        {
+          "id": "thresholds-required",
+          "text": "States that thresholds in options.thresholds are required to enforce SLA in CI"
+        },
+        {
+          "id": "concrete-example",
+          "text": "Provides a concrete threshold code example, not just an explanation"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need to load test a Kafka consumer that processes order events. What tool should I use and how do I get started?",
+      "expected_output": "Recommends xk6-kafka with the custom build command, or JMeter with Kafka plugin. Does not suggest a generic HTTP tool.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "correct-tool",
+          "text": "Recommends xk6-kafka or JMeter Kafka plugin - not a generic HTTP tool like plain k6 or Gatling HTTP"
+        },
+        {
+          "id": "xk6-build-command",
+          "text": "Includes the xk6 custom build command or JMeter plugin installation reference"
+        },
+        {
+          "id": "not-http",
+          "text": "Does not suggest testing Kafka via HTTP endpoints as a primary approach"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My JMeter test runs fine locally but JMeter crashes after 20 minutes in CI with an OutOfMemoryError. The test plan works on my machine with 50 threads.",
+      "expected_output": "Identifies listeners enabled in non-GUI run as the primary cause. Recommends disabling listeners and using -l flag for output.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "listener-root-cause",
+          "text": "Identifies enabled listeners (View Results Tree, Aggregate Report etc.) in non-GUI runs as the memory leak cause"
+        },
+        {
+          "id": "disable-listeners",
+          "text": "Recommends disabling listeners in the test plan for CI runs"
+        },
+        {
+          "id": "jtl-output",
+          "text": "Mentions using -l results.jtl flag as the correct output method for non-GUI runs"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "We're migrating our load tests from LoadRunner to k6. What does a VuGen Action map to in k6, and what about think time and correlation?",
+      "expected_output": "Maps VuGen Action → k6 default() function. Maps lr_think_time() → sleep(). Maps web_reg_save_param → res.json() or regex extraction.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "action-mapping",
+          "text": "Maps VuGen Action() specifically to k6 default() function"
+        },
+        {
+          "id": "think-time-mapping",
+          "text": "Maps lr_think_time() to k6 sleep()"
+        },
+        {
+          "id": "correlation-mapping",
+          "text": "Maps web_reg_save_param or LoadRunner correlation to k6 res.json() or regex extraction"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I'm writing a k6 script for an e-commerce checkout flow: login → browse → add to cart → checkout. Should I use shared-iterations or per-vu-iterations?",
+      "expected_output": "Recommends per-vu-iterations. Explains that shared-iterations causes VUs to skip steps in multi-step journeys, producing incorrect metrics.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "correct-executor",
+          "text": "Recommends per-vu-iterations for the user journey"
+        },
+        {
+          "id": "shared-iterations-problem",
+          "text": "Explains why shared-iterations is wrong for journeys - VUs race for iterations and may skip steps"
+        },
+        {
+          "id": "not-ambiguous",
+          "text": "Gives a clear recommendation, not a 'it depends' answer without a conclusion"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "My Locust test shows zero failures even though I can see 404 and 500 errors in the server logs during the test run.",
+      "expected_output": "Identifies missing catch_response=True as the cause. Without it, Locust counts all HTTP responses as success regardless of status code.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "catch-response-cause",
+          "text": "Identifies missing catch_response=True as the root cause"
+        },
+        {
+          "id": "failure-call",
+          "text": "Explains that r.failure() must be called explicitly inside the catch_response context manager"
+        },
+        {
+          "id": "code-example",
+          "text": "Provides a corrected code snippet using catch_response=True"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "What are good starting threshold values for a REST API and a checkout payment endpoint in k6?",
+      "expected_output": "Provides differentiated thresholds: REST API p95<500ms, checkout p95<1000ms with stricter error rate. Includes both http_req_duration and http_req_waiting. Notes these are baselines to adjust.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "differentiated-thresholds",
+          "text": "Gives different threshold values for REST API vs checkout - not the same value for both"
+        },
+        {
+          "id": "http-req-waiting",
+          "text": "Includes http_req_waiting as a separate threshold alongside http_req_duration"
+        },
+        {
+          "id": "checks-threshold",
+          "text": "Includes checks: rate>0.99 threshold"
+        },
+        {
+          "id": "adjust-caveat",
+          "text": "Notes that values are baselines and should be adjusted to actual SLA requirements"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "My Artillery test reports great metrics but my CI pipeline always passes even when p95 latency is 5 seconds. How do I make the test fail in CI?",
+      "expected_output": "Identifies missing ensure block as the cause. Without ensure, Artillery always exits 0. Provides an ensure.thresholds example with p95 and error rate conditions.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "ensure-block-cause",
+          "text": "Identifies that without an ensure block, Artillery always exits 0 regardless of metrics"
+        },
+        {
+          "id": "ensure-example",
+          "text": "Provides a concrete ensure.thresholds or ensure.conditions YAML example"
+        },
+        {
+          "id": "exit-code",
+          "text": "Explains that ensure causes a non-zero exit code when thresholds are breached, enabling CI gating"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "I set arrivalRate to 100 in Artillery expecting 100 concurrent users, but my backend is getting overwhelmed with way more than 100 simultaneous requests. What's happening?",
+      "expected_output": "Explains that arrivalRate is new users per second (open model), not concurrency. On a slow backend, VUs pile up unbounded. Recommends maxVusers to cap concurrency or arrivalCount for a fixed total.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "open-model-explanation",
+          "text": "Explains that arrivalRate means new users per second (open model), not concurrent users"
+        },
+        {
+          "id": "pileup-risk",
+          "text": "Explains that on a slow backend, pending VUs accumulate unboundedly"
+        },
+        {
+          "id": "maxvusers-fix",
+          "text": "Recommends maxVusers to cap real concurrency, or arrivalCount for a fixed total number of users"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "We're benchmarking our vLLM endpoint for a chat application. What metrics should we measure and what tools should we use?",
+      "expected_output": "Recommends TTFT, TPOT/ITL, tokens per second, and goodput as key metrics. Suggests vLLM bench, GenAI-Perf, GuideLLM, or llmperf as benchmarking tools. Distinguishes streaming vs non-streaming measurement.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "ttft-tpot-metrics",
+          "text": "Names TTFT (time to first token) and TPOT or ITL (inter-token latency) as key streaming metrics"
+        },
+        {
+          "id": "benchmarking-tools",
+          "text": "Recommends at least one specific LLM benchmarking tool such as vLLM bench, GenAI-Perf, GuideLLM, or llmperf"
+        },
+        {
+          "id": "goodput-or-throughput",
+          "text": "Mentions goodput or tokens per second as a throughput metric distinct from raw request latency"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "How do I set up SLO-based CI gating for my k6 load tests? I want the build to fail if we burn more than 2% of our error budget.",
+      "expected_output": "Explains error budget concept (100% - SLO target). Shows how to translate an error budget into k6 thresholds. Recommends tracking burn rate over the test window.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "error-budget-concept",
+          "text": "Explains error budget as 100% minus the SLO target (e.g., 99.9% SLO = 0.1% budget)"
+        },
+        {
+          "id": "k6-threshold-mapping",
+          "text": "Shows how to express the error budget as concrete k6 thresholds"
+        },
+        {
+          "id": "burn-rate",
+          "text": "Mentions burn rate or multi-window alerting as a way to avoid false positives from short test runs"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "We're on-prem only, the team writes Go, and we need to load test a gRPC service. Which tool should we pick?",
+      "expected_output": "Queries the perf.jmeter.ai catalog (tools.json), filters to Active tools with gRPC protocol support and self-hosted deployment, and shortlists 2-3 with citations to their perf.jmeter.ai pages.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "cites-catalog",
+          "text": "References https://perf.jmeter.ai/tools.json as the source for tool selection"
+        },
+        {
+          "id": "filters-active-and-protocol",
+          "text": "Filters on status Active and gRPC protocol support rather than listing tools from memory"
+        },
+        {
+          "id": "shortlist-with-links",
+          "text": "Shortlists 2-3 candidate tools and cites their perf.jmeter.ai directoryUrl pages"
+        },
+        {
+          "id": "no-discontinued",
+          "text": "Does not recommend a tool whose catalog status is Discontinued"
+        }
+      ]
+    }
+  ]
+}

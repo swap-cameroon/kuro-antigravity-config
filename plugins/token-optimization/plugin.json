@@ -1,0 +1,5 @@
+{
+  "name": "token-optimization",
+  "version": "1.0.0",
+  "description": "Token reduction and context optimization plugin for Antigravity"
+}
