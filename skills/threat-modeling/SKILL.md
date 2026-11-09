@@ -8,7 +8,7 @@ metadata:
 
 # Threat modeling
 
-Run it at design time (cheapest fix) and again when a trust boundary changes. Output `THREAT_MODEL.md`; feed mitigations into Victor's ADRs, Lucas's tests and Marcus's gate. Code-level hunting is `security-auditor` / `llm-sast-scanner`.
+Run it at design time (cheapest fix) and again when a trust boundary changes. Output `THREAT_MODEL.md`; feed mitigations into Njoya's ADRs, Lukong's tests and Hayatou's gate. Code-level hunting is `security-auditor` / `llm-sast-scanner`.
 
 ## 1. Scope the model (4 questions)
 What are we building? What can go wrong? What will we do about it? Did we do a good job? Write the scope, version and date at the top.

@@ -25,7 +25,7 @@ Output: `PRD.md` that a designer, engineer and tester can each act on without as
 - Every criterion is observable and binary; reject "fast", "intuitive", "robust" without a number.
 - Edge cases checklist: empty, max size, concurrency, duplicate submit, timezone/locale, partial failure, abuse.
 - Trace: outcome -> journey -> story -> AC. Orphans are deleted or justified.
-- Hand-off: Victor consumes NFRs and constraints; Lucas maps AC to tests; David reads availability and data-retention.
+- Hand-off: Njoya consumes NFRs and constraints; Lukong maps AC to tests; Endeley reads availability and data-retention.
 
 ## Template
 ```

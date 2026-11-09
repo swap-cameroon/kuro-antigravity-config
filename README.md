@@ -6,7 +6,7 @@ A portable, versioned setup for **Google Antigravity (`agy`)**: a 13-agent engin
 
 | Piece | Where | Purpose |
 | :-- | :-- | :-- |
-| Team rules (always on, 24 lines) | `plugins/team-kuro/` | Roles, routing, lifecycle gates, honesty rules |
+| Team rules (always on, 27 lines) | `plugins/team-kuro/` | Roles, routing, lifecycle gates, honesty rules |
 | Token rules (always on, 11 lines) | `plugins/token-optimization/` | Output/read/command discipline |
 | Skills (on demand) | `skills/` | 35 domain playbooks - see [docs/SKILLS.md](docs/SKILLS.md) |
 | Team roster | `team/roster.json` | Single source of truth: who owns which skill, deliverable and gate |
@@ -20,33 +20,35 @@ Estimated with 1 token ~ 4 characters (`python scripts/validate.py --report`):
 
 | | Initial import | Now |
 | :-- | --: | --: |
-| Always-on rules (every turn) | ~2,250 | ~1,000 |
+| Always-on rules (every turn) | ~2,250 | ~1,110 |
 | Skill names + descriptions (every turn, if your host lists them) | ~3,880 | ~3,680 (50 skills instead of 35) |
-| **Baseline per turn** | **~6,130** | **~4,680 (-24%, with 15 more skills)** |
+| **Baseline per turn** | **~6,130** | **~4,790 (-22%, with 15 more skills and personas)** |
 | Heaviest SKILL.md on activation | ~8,070 | ~5,810 |
 | Five heaviest SKILL.md combined | ~32,000 | ~20,600 |
 
-How: oversized skills (`secure-by-design-coding`, `angular-structure`, `angular-security`, `security-auditor`, `perf`, `code-reviewer-angular`) keep their core rules in `SKILL.md` and expose the rest as `references/*.md` behind a "Load on demand" index; content is moved verbatim, never rewritten. Descriptions were tightened while keeping their routing triggers. CI fails if the always-on rules exceed 1,100 tokens, descriptions exceed 3,900 tokens in total, or a description exceeds 520 characters, and warns when a `SKILL.md` exceeds ~3,500 tokens.
+How: oversized skills (`secure-by-design-coding`, `angular-structure`, `angular-security`, `security-auditor`, `perf`, `code-reviewer-angular`) keep their core rules in `SKILL.md` and expose the rest as `references/*.md` behind a "Load on demand" index; content is moved verbatim, never rewritten. Descriptions were tightened while keeping their routing triggers. CI fails if the always-on rules exceed 1,200 tokens, descriptions exceed 3,900 tokens in total, or a description exceeds 520 characters, and warns when a `SKILL.md` exceeds ~3,500 tokens.
 
 ## Team
 
 | Member | Role | Core skills | Gate they enforce |
 | :-- | :-- | :-- | :-- |
-| **Sarah** | Product & domain strategy | `product-requirements`, `spec-miner` | Acceptance criteria exist and are testable |
-| **Victor** | Architecture & critical review | `first-principles`, `system-design-architect` | ADRs with rejected alternatives |
-| **Alex** | UI/UX engineering | `angular-*`, `react-nextjs`, `ui-design-a11y` | WCAG 2.2 AA, safe DOM |
-| **Elena** | Backend & DBA | `spring-data-jpa`, `postgres`, `api-design`, `backend-performance-review` | Reversible migrations, explain plans |
-| **Marcus** | Security | `security-auditor`, `threat-modeling`, `llm-sast-scanner`, `secure-by-design-coding`, `secrets-scanner` | No open critical/high, no secrets |
-| **Lucas** | QA automation | `test-strategy`, `spring-testing`, `api-contract-testing`, `code-reviewer` | Every criterion has a test |
-| **David** | DevOps, cloud, SRE | `devops-engineer`, `cloud-architect`, `sre-engineer`, `observability` | Green pipeline, rollback documented |
-| *Theo* | Node/TS and Python backends | `node-typescript-backend`, `python-fastapi` | Strict typing, boundary validation |
-| *Maya* | Mobile (Flutter, RN, native) | `mobile-engineering` | Keychain/Keystore, staged rollout |
-| *Ines* | Data & AI | `data-engineering`, `llm-app-engineering` | Idempotent jobs, LLM regression evals |
-| *Kai* | Debugging & refactoring | `systematic-debugging`, `refactoring-legacy` | Reproduce before fix, behaviour preserved |
-| *Nora* | Documentation & DX | `technical-writing` | Every documented command was run |
-| *Ravi* | Release & git | `git-workflow-release` | Green main, SemVer matches changes, rollback |
+| **Ngono** | Product & domain strategy | `product-requirements`, `spec-miner` | Acceptance criteria exist and are testable |
+| **Njoya** | Architecture & critical review | `first-principles`, `system-design-architect` | ADRs with rejected alternatives |
+| **Kouam** | UI/UX engineering | `angular-*`, `react-nextjs`, `ui-design-a11y` | WCAG 2.2 AA, safe DOM |
+| **Kamdem** | Backend & DBA | `spring-data-jpa`, `postgres`, `api-design`, `backend-performance-review` | Reversible migrations, explain plans |
+| **Hayatou** | Security | `security-auditor`, `threat-modeling`, `llm-sast-scanner`, `secure-by-design-coding`, `secrets-scanner` | No open critical/high, no secrets |
+| **Lukong** | QA automation | `test-strategy`, `spring-testing`, `api-contract-testing`, `code-reviewer` | Every criterion has a test |
+| **Endeley** | DevOps, cloud, SRE | `devops-engineer`, `cloud-architect`, `sre-engineer`, `observability` | Green pipeline, rollback documented |
+| *Ondoua* | Node/TS and Python backends | `node-typescript-backend`, `python-fastapi` | Strict typing, boundary validation |
+| *Bouba* | Mobile (Flutter, RN, native) | `mobile-engineering` | Keychain/Keystore, staged rollout |
+| *Manga* | Data & AI | `data-engineering`, `llm-app-engineering` | Idempotent jobs, LLM regression evals |
+| *Matip* | Debugging & refactoring | `systematic-debugging`, `refactoring-legacy` | Reproduce before fix, behaviour preserved |
+| *Nchare* | Documentation & DX | `technical-writing` | Every documented command was run |
+| *Ndumbe* | Release & git | `git-workflow-release` | Green main, SemVer matches changes, rollback |
 
-Lifecycle: Sarah -> Victor -> Alex/Elena (or the specialist Victor selects) -> Marcus -> Lucas -> David. Specialists (italic) are summoned only when the work calls for them. Full protocol: `skills/team-orchestration`.
+Each agent has a Cameroonian name and a persona drawn from the heritage it honours (traits, voice and a *blind spot* that peers challenge); the full profiles are in [docs/TEAM.md](docs/TEAM.md). Personas shape tone and working style only: technical standards and gates are identical for everyone, and they make no claim about real people. Edit `team/roster.json` to adjust any name or persona, then regenerate the docs.
+
+Lifecycle: Ngono -> Njoya -> Kouam/Kamdem (or the specialist Njoya selects) -> Hayatou -> Lukong -> Endeley. Specialists (italic) are summoned only when the work calls for them. Full protocol: `skills/team-orchestration`.
 
 ## Install
 

@@ -23,7 +23,7 @@ Required env vars (names only): `<VAR_A>`, `<VAR_B>` - obtained from <where>.
 
 ## 4. Current in-flight task
 - **Task**: <what>
-- **Owner role**: <Alex/Elena/...>
+- **Owner role**: <Kouam/Kamdem/...>
 - **Where**: `<file>` / `<symbol>`
 - **Done so far**: <state>
 - **To continue**: <exact next step>
@@ -52,8 +52,8 @@ Required env vars (names only): `<VAR_A>`, `<VAR_B>` - obtained from <where>.
 ## 9. Gate status
 | Gate | Status | Evidence / waiver |
 | :-- | :-- | :-- |
-| Spec (Sarah) | | |
-| Architecture (Victor) | | |
-| Security (Marcus) | | |
-| Tests (Lucas) | | |
-| Deploy (David) | | |
+| Spec (Ngono) | | |
+| Architecture (Njoya) | | |
+| Security (Hayatou) | | |
+| Tests (Lukong) | | |
+| Deploy (Endeley) | | |

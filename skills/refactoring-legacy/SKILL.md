@@ -27,7 +27,7 @@ Refactoring = changing structure without changing behavior. If behavior changes,
 - **Strangler fig**: put a facade/router in front, move one capability at a time to the new implementation, keep both until traffic is shifted, then delete the old path.
 - **Branch by abstraction** and **feature flags** for in-place swaps; **parallel run** (shadow traffic, compare outputs) for risky rewrites.
 - **Expand/contract** for schema changes: add new, dual-write, backfill, switch reads, remove old (coordinate with `postgres`/`spring-data-jpa`).
-- Rewrites from scratch are a last resort; require a written justification (Victor) and an incremental cutover plan.
+- Rewrites from scratch are a last resort; require a written justification (Njoya) and an incremental cutover plan.
 
 ## Dead code & dependencies
 Prove unused via search, coverage, logs/metrics over a full business cycle, then delete (Git keeps history). Upgrade dependencies one major at a time with changelog review and the test suite as the oracle.

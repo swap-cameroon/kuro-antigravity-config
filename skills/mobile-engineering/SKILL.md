@@ -8,7 +8,7 @@ metadata:
 
 # Mobile engineering
 
-## Choose the stack (Victor decides with Maya; record an ADR)
+## Choose the stack (Njoya decides with Bouba; record an ADR)
 | Need | Pick |
 | :-- | :-- |
 | One codebase, custom UI, strong perf | Flutter |
