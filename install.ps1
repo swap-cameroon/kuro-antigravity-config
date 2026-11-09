@@ -17,6 +17,10 @@
 .PARAMETER EnableInterceptor
   Registers the token-saver PreInvocation prompt interceptor in hooks.json (merged, existing hooks kept).
 
+.PARAMETER EnableTeamHook
+  Registers the Team Kuro PreInvocation hook (session bootstrap + per-instruction huddle) in hooks.json
+  (merged, existing hooks kept). Needs Python on PATH. Mode is set in team\config.json.
+
 .PARAMETER DryRun
   Shows what would happen without changing anything.
 
@@ -30,6 +34,7 @@
 param(
     [string]$TargetDir = (Join-Path $HOME ".gemini\config"),
     [switch]$EnableInterceptor,
+    [switch]$EnableTeamHook,
     [switch]$DryRun,
     [switch]$SkipValidation
 )
@@ -124,26 +129,34 @@ foreach ($k in $cfgSrc.Keys) {
     }
 }
 
-if ($EnableInterceptor) {
-    $hookScript = Join-Path $TargetDir "skills\token-saver\resources\intercept_wasteful_prompts.py"
+function Register-Hook([string]$Name, [string]$Command) {
     $hooksFile = Join-Path $TargetDir "hooks.json"
-    Act "register PreInvocation interceptor in hooks.json"
-    if (-not $DryRun) {
-        $raw = if (Test-Path $hooksFile) { Get-Content $hooksFile -Raw } else { "{}" }
-        if ([string]::IsNullOrWhiteSpace($raw)) { $raw = "{}" }
-        $hooks = $raw | ConvertFrom-Json
-        $entry = [pscustomobject]@{
-            PreInvocation = @([pscustomobject]@{
-                type = "command"
-                command = "python `"$($hookScript -replace '\\','/')`""
-                timeout = 10
-            })
-        }
-        if ($hooks.PSObject.Properties.Name -contains "kuro-token-guard") { $hooks."kuro-token-guard" = $entry }
-        else { $hooks | Add-Member -NotePropertyName "kuro-token-guard" -NotePropertyValue $entry }
-        Copy-Item -Force $hooksFile "$hooksFile.bak" -ErrorAction SilentlyContinue
-        $hooks | ConvertTo-Json -Depth 10 | Set-Content -Path $hooksFile -Encoding UTF8
-        Ok "interceptor registered (previous hooks.json saved as hooks.json.bak)"
+    Act "register '$Name' PreInvocation hook in hooks.json"
+    if ($DryRun) { return }
+    $raw = if (Test-Path $hooksFile) { Get-Content $hooksFile -Raw } else { "{}" }
+    if ([string]::IsNullOrWhiteSpace($raw)) { $raw = "{}" }
+    $hooks = $raw | ConvertFrom-Json
+    $entry = [pscustomobject]@{
+        PreInvocation = @([pscustomobject]@{ type = "command"; command = $Command; timeout = 10 })
+    }
+    if ($hooks.PSObject.Properties.Name -contains $Name) { $hooks.$Name = $entry }
+    else { $hooks | Add-Member -NotePropertyName $Name -NotePropertyValue $entry }
+    if (Test-Path $hooksFile) { Copy-Item -Force $hooksFile "$hooksFile.bak" }
+    $hooks | ConvertTo-Json -Depth 10 | Set-Content -Path $hooksFile -Encoding UTF8
+    Ok "$Name registered (previous hooks.json saved as hooks.json.bak)"
+}
+
+if ($EnableInterceptor -or $EnableTeamHook) {
+    $pyCmd = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pyCmd) { Fail "-EnableInterceptor/-EnableTeamHook need Python on PATH" }
+    $pyExe = $pyCmd.Source -replace '\\', '/'
+    if ($EnableInterceptor) {
+        $s = (Join-Path $TargetDir "skills\token-saver\resources\intercept_wasteful_prompts.py") -replace '\\', '/'
+        Register-Hook "kuro-token-guard" "`"$pyExe`" `"$s`""
+    }
+    if ($EnableTeamHook) {
+        $s = (Join-Path $TargetDir "team\hooks\kuro_huddle.py") -replace '\\', '/'
+        Register-Hook "kuro-team-huddle" "`"$pyExe`" `"$s`""
     }
 }
 

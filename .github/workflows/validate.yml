@@ -12,6 +12,14 @@ jobs:
           python-version: "3.12"
       - name: Validate skills, roster, links, catalog
         run: python scripts/validate.py --strict --report
+      - name: Team huddle hook tests
+        env:
+          PYTHONUTF8: "1"
+        run: python -m unittest discover -s team/hooks -v
+      - name: Ledger tests
+        env:
+          PYTHONUTF8: "1"
+        run: python -m unittest discover -s team/tools -v
       - name: Token-saver tests (scripts, not unittest)
         working-directory: skills/token-saver
         env:
