@@ -1,0 +1,32 @@
+Team Kuro configuration - third-party notices
+
+This repository bundles skills created by other authors. Each skill keeps the
+license and author declared in its own SKILL.md frontmatter (and LICENSE file
+where present). Recorded provenance:
+
+  angular-developer           MIT - Copyright 2026 Google LLC
+  angular-security            MIT - Marwen Amamou
+  angular-structure           MIT - Marwen Amamou
+  code-reviewer               MIT - Marwen Amamou
+  code-reviewer-angular       MIT - Marwen Amamou
+  postgres                    MIT - Marwen Amamou
+  secure-by-design-coding     MIT - Marwen Amamou
+  security-auditor            MIT - Marwen Amamou
+  cloud-architect             MIT - https://github.com/Jeffallan
+  devops-engineer             MIT - https://github.com/Jeffallan
+  spec-miner                  MIT - https://github.com/Jeffallan
+  sre-engineer                MIT - https://github.com/Jeffallan
+  system-design-architect     MIT - pinchen147
+  backend-performance-review  MIT (see skill frontmatter)
+  first-principles            MIT (see skills/first-principles/LICENSE)
+
+Provenance NOT recorded in the files (origin and license to be confirmed by the
+maintainer before redistributing this repository publicly):
+
+  api-contract-testing, compliance-mapper, dast-scanner, dependency-audit,
+  http-resilience, llm-sast-scanner, pentest-audit, perf, remediation-validator,
+  secrets-scanner, security-audit, security-config-review, security-hardening,
+  spring-data-jpa, spring-security, spring-testing, token-saver
+
+Skills authored for this repository: team-orchestration, project-state,
+ui-design-a11y (MIT).

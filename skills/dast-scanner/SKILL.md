@@ -1,5 +1,5 @@
 ---
-name: DAST Scanner
+name: dast-scanner
 description: Dynamic Application Security Testing - sends crafted HTTP requests to running web server endpoints to detect vulnerabilities
 trigger: When user asks to dynamically test, probe, scan, attack, or pentest a running web application's HTTP endpoints
 ---

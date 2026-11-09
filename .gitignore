@@ -1,0 +1,22 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+
+# Machine-specific Antigravity settings must never be committed
+config.json
+hooks.json.bak
+.kuro-backup/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key

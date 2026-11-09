@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""Validate the Team Kuro configuration repository.
+
+Checks (errors fail the run, warnings do not unless --strict):
+  * every skills/<dir>/SKILL.md has YAML frontmatter with `name` == <dir> and a description
+  * relative markdown links in SKILL.md files resolve (warning for vendored reference files)
+  * team/roster.json only references skills that exist, and every skill is owned by someone
+  * JSON files parse, plugin.json files have the required keys
+  * the install scripts and README skill count agree with the real number of skills
+  * docs/SKILLS.md is up to date (use --write-catalog to regenerate it)
+
+Usage:  python scripts/validate.py [--strict] [--write-catalog]
+Only the standard library is used, so it runs anywhere (CI, Windows, macOS, Linux).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SKILLS = ROOT / "skills"
+LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+FENCE_RE = re.compile(r"```.*?```", re.S)
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+errors: list[str] = []
+warnings: list[str] = []
+
+
+def err(msg: str) -> None:
+    errors.append(msg)
+
+
+def warn(msg: str) -> None:
+    warnings.append(msg)
+
+
+def parse_frontmatter(text: str) -> dict[str, str] | None:
+    """Tiny frontmatter reader: top-level `key:` entries only (enough for presence checks)."""
+    lines = text.lstrip("﻿").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    out: dict[str, str] = {}
+    key = None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return out
+        m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", line)
+        if m:
+            key = m.group(1)
+            out[key] = m.group(2).strip()
+        elif key and line.startswith((" ", "\t")):
+            out[key] = (out[key] + " " + line.strip()).strip()
+    return None  # never closed
+
+
+def skill_dirs() -> list[Path]:
+    return sorted(p for p in SKILLS.iterdir() if p.is_dir())
+
+
+def check_skills() -> dict[str, dict[str, str]]:
+    meta: dict[str, dict[str, str]] = {}
+    for d in skill_dirs():
+        f = d / "SKILL.md"
+        if not f.exists():
+            err(f"{d.relative_to(ROOT)}: missing SKILL.md")
+            continue
+        fm = parse_frontmatter(f.read_text(encoding="utf-8", errors="replace"))
+        if fm is None:
+            err(f"{f.relative_to(ROOT)}: missing or unterminated YAML frontmatter")
+            continue
+        if fm.get("name") != d.name:
+            err(f"{f.relative_to(ROOT)}: name '{fm.get('name')}' must equal directory '{d.name}'")
+        desc = fm.get("description", "")
+        if desc in ("", "|", ">", "|-", ">-") or len(desc) < 20:
+            err(f"{f.relative_to(ROOT)}: description missing or too short (it drives skill routing)")
+        meta[d.name] = fm
+    return meta
+
+
+def check_links() -> None:
+    for md in sorted(ROOT.glob("skills/**/*.md")) + sorted(ROOT.glob("plugins/**/*.md")):
+        text = md.read_text(encoding="utf-8", errors="replace")
+        text = INLINE_CODE_RE.sub("", FENCE_RE.sub("", text))
+        for target in LINK_RE.findall(text):
+            if re.match(r"^(https?:|mailto:|#|<|\{)", target) or "://" in target:
+                continue
+            path = target.split("#", 1)[0]
+            if not path or path.startswith(("/", "~")) or any(c in path for c in "*<>{}$"):
+                continue
+            if not (md.parent / path).exists():
+                (err if md.name == "SKILL.md" else warn)(
+                    f"{md.relative_to(ROOT)}: broken relative link -> {target}"
+                )
+
+
+def check_roster(skill_names: set[str]) -> dict:
+    f = ROOT / "team" / "roster.json"
+    if not f.exists():
+        err("team/roster.json missing")
+        return {}
+    roster = json.loads(f.read_text(encoding="utf-8"))
+    owned: set[str] = set()
+    for m in roster["members"]:
+        for s in m["skills"] + m.get("optional_skills", []):
+            owned.add(s)
+            if s not in skill_names:
+                err(f"team/roster.json: {m['name']} references unknown skill '{s}'")
+    for s in sorted(skill_names - owned - set(roster.get("shared_skills", []))):
+        warn(f"skill '{s}' is not owned by any team member (add it to team/roster.json)")
+    for s in roster.get("shared_skills", []):
+        if s not in skill_names:
+            err(f"team/roster.json: shared skill '{s}' does not exist")
+    return roster
+
+
+def check_json_and_plugins() -> None:
+    for f in ROOT.glob("*.json"):
+        try:
+            json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err(f"{f.name}: invalid JSON ({e})")
+    for p in ROOT.glob("plugins/*/plugin.json"):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err(f"{p.relative_to(ROOT)}: invalid JSON ({e})")
+            continue
+        for k in ("name", "version", "description"):
+            if k not in data:
+                err(f"{p.relative_to(ROOT)}: missing '{k}'")
+        if data.get("name") != p.parent.name:
+            err(f"{p.relative_to(ROOT)}: name must equal directory '{p.parent.name}'")
+
+
+def category(name: str) -> str:
+    table = [
+        ("Frontend", ("angular",)),
+        ("Backend & data", ("spring", "postgres", "backend", "http-resilience", "perf")),
+        ("Security", ("security", "sast", "dast", "pentest", "secrets", "dependency", "compliance",
+                      "remediation", "secure-by")),
+        ("Architecture & product", ("system-design", "first-principles", "spec-miner")),
+        ("Delivery, cloud & reliability", ("devops", "cloud", "sre")),
+        ("Quality", ("code-review", "api-contract")),
+        ("Team & tokens", ("team-", "project-state", "token", "ui-design")),
+    ]
+    for label, prefixes in table:
+        if name.startswith(prefixes):
+            return label
+    return "Other"
+
+
+def build_catalog(meta: dict[str, dict[str, str]], roster: dict) -> str:
+    owners: dict[str, list[str]] = {}
+    for m in roster.get("members", []):
+        for s in m["skills"] + m.get("optional_skills", []):
+            owners.setdefault(s, []).append(m["name"])
+    groups: dict[str, list[str]] = {}
+    for n in meta:
+        groups.setdefault(category(n), []).append(n)
+    out = ["# Skill catalog", "",
+           "_Generated by `python scripts/validate.py --write-catalog` - do not edit by hand._", "",
+           f"**{len(meta)} skills**", ""]
+    for label in sorted(groups):
+        out += [f"## {label}", "", "| Skill | Owner(s) | Description |", "| :-- | :-- | :-- |"]
+        for n in sorted(groups[label]):
+            d = meta[n].get("description", "").replace("|", "\\|")
+            d = d if len(d) <= 160 else d[:157].rstrip() + "..."
+            out.append(f"| `{n}` | {', '.join(owners.get(n, ['shared']))} | {d} |")
+        out.append("")
+    return "\n".join(out)
+
+
+def check_counts(n_skills: int) -> None:
+    for rel in ("README.md", "install.ps1", "install.sh"):
+        f = ROOT / rel
+        if not f.exists():
+            continue
+        for m in re.finditer(r"\b(\d+)\s+(?:specialized\s+|specialised\s+|domain\s+)*skills\b",
+                             f.read_text(encoding="utf-8")):
+            if int(m.group(1)) != n_skills:
+                err(f"{rel}: claims {m.group(1)} skills but {n_skills} exist")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true", help="treat warnings as errors")
+    ap.add_argument("--write-catalog", action="store_true", help="regenerate docs/SKILLS.md")
+    args = ap.parse_args()
+
+    meta = check_skills()
+    check_links()
+    roster = check_roster(set(meta))
+    check_json_and_plugins()
+    check_counts(len(meta))
+
+    catalog = build_catalog(meta, roster)
+    cat_file = ROOT / "docs" / "SKILLS.md"
+    if args.write_catalog:
+        cat_file.parent.mkdir(exist_ok=True)
+        cat_file.write_text(catalog + "\n", encoding="utf-8", newline="\n")
+        print(f"wrote {cat_file.relative_to(ROOT)}")
+    elif not cat_file.exists() or cat_file.read_text(encoding="utf-8").strip() != catalog.strip():
+        err("docs/SKILLS.md is out of date - run: python scripts/validate.py --write-catalog")
+
+    for w in warnings:
+        print(f"WARN  {w}")
+    for e in errors:
+        print(f"ERROR {e}")
+    print(f"\n{len(meta)} skills | {len(errors)} error(s) | {len(warnings)} warning(s)")
+    return 1 if errors or (args.strict and warnings) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

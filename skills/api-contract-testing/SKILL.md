@@ -1,5 +1,5 @@
 ---
-name: API Contract Testing
+name: api-contract-testing
 description: Validates API specifications against actual endpoint behavior. Tests any HTTP API regardless of backend technology.
 triggers:
   - test API contracts

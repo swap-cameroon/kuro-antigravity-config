@@ -1,5 +1,5 @@
 {
   "name": "token-optimization",
-  "version": "1.0.0",
-  "description": "Token reduction and context optimization plugin for Antigravity"
+  "version": "1.1.0",
+  "description": "Always-on token discipline rules for Antigravity; detailed playbook in the token-saver skill"
 }

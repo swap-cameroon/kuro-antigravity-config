@@ -1,0 +1,25 @@
+name: validate
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate skills, roster, links, catalog
+        run: python scripts/validate.py
+      - name: Token-saver tests (scripts, not unittest)
+        working-directory: skills/token-saver
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python test_interceptor.py
+          python test_token_saver.py
+          python evals/run_evals.py
+          git checkout -- benchmark_report.md evals/results/eval_results.json
+      - name: Shell syntax
+        run: bash -n install.sh

@@ -1,4 +1,6 @@
 ---
+name: secrets-scanner
+description: Detects hardcoded secrets (API keys, tokens, passwords, private keys, connection strings) in source, config files and git history, language-agnostic, with severity triage and remediation steps. Use when asked to scan for secrets, find leaked credentials or audit exposed tokens.
 trigger: When user asks to scan for secrets, find hardcoded credentials, detect API keys, check for exposed tokens, or audit for leaked passwords
 ---
 

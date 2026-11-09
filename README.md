@@ -1,47 +1,75 @@
-# ⚡ Team Kuro — Antigravity Multi-Agent Configuration
+# Team Kuro - Antigravity multi-agent configuration
 
-> Complete, production-grade configuration for **Google Antigravity (`agy`)** featuring **Team Kuro**: an autonomous 7-member software engineering team, 32 specialized domain skills, token optimization, and zero-token cold resume.
+A portable, versioned setup for **Google Antigravity (`agy`)**: a 7-role engineering team with gated delivery, 35 skills loaded on demand, token discipline, and a handover protocol so any session (or colleague) resumes instantly.
 
----
+## What you get
 
-## 👥 Team Kuro Roster
+| Piece | Where | Purpose |
+| :-- | :-- | :-- |
+| Team rules (always on, ~35 lines) | `plugins/team-kuro/` | Roles, routing, lifecycle gates, honesty rules |
+| Token rules (always on, ~15 lines) | `plugins/token-optimization/` | Output/read/command discipline |
+| Skills (on demand) | `skills/` | 35 domain playbooks - see [docs/SKILLS.md](docs/SKILLS.md) |
+| Team roster | `team/roster.json` | Single source of truth: who owns which skill, deliverable and gate |
+| Handover | `skills/project-state/` | `PROJECT_STATE.md` template + resume/update protocol |
 
-| Member | Title | Responsibilities & Skills |
-| :--- | :--- | :--- |
-| **Sarah** | *Lead Product & Domain Strategist* | Business modeling, user stories, acceptance criteria (`spec-miner`) |
-| **Victor** | *Principal Systems Architect & Problem Solver* | First-principles logic audit, ADRs, trade-off analysis (`first-principles`, `system-design-architect`) |
-| **Alex** | *Staff UI/UX Engineer* | Reactive state, design systems, ARIA a11y, animations (`angular-*`, Tailwind, CSS) |
-| **Elena** | *Lead Backend & Database DBA* | Relational models, JPA, query tuning, scaling (`spring-data-jpa`, `postgres`, performance) |
-| **Marcus** | *Principal Security Architect* | OWASP gates, SAST/DAST, input sanitization (`security-auditor`, `llm-sast-scanner`) |
-| **Lucas** | *QA Automation Lead* | Test suites, API contracts, non-regression (`spring-testing`, `api-contract-testing`) |
-| **David** | *Staff DevOps, Cloud & SRE Engineer* | Docker, K8s, CI/CD, reverse-proxies, monitoring (`devops-engineer`, `cloud-architect`, `sre-engineer`) |
+Design rule: **always-loaded files stay tiny; detail lives in skills** that are read only when the task needs them.
 
----
+## Team
 
-## 🚀 Quick Setup on a New PC (Windows)
+| Member | Role | Core skills | Gate they enforce |
+| :-- | :-- | :-- | :-- |
+| **Sarah** | Product & domain strategy | `spec-miner` | Acceptance criteria exist and are testable |
+| **Victor** | Architecture & critical review | `first-principles`, `system-design-architect` | ADRs with rejected alternatives |
+| **Alex** | UI/UX engineering | `angular-*`, `ui-design-a11y` | WCAG 2.2 AA, safe DOM |
+| **Elena** | Backend & DBA | `spring-data-jpa`, `postgres`, `backend-performance-review` | Reversible migrations, explain plans |
+| **Marcus** | Security | `security-auditor`, `llm-sast-scanner`, `secure-by-design-coding`, `secrets-scanner` | No open critical/high, no secrets |
+| **Lucas** | QA automation | `spring-testing`, `api-contract-testing`, `code-reviewer` | Every criterion has a test |
+| **David** | DevOps, cloud, SRE | `devops-engineer`, `cloud-architect`, `sre-engineer` | Green pipeline, rollback documented |
 
-1. Clone this repository on your new machine:
-   ```powershell
-   git clone https://github.com/swap-cameroon/kuro-antigravity-config.git
-   cd kuro-antigravity-config
-   ```
+Lifecycle: Sarah -> Victor -> Alex/Elena -> Marcus -> Lucas -> David. Full protocol: `skills/team-orchestration`.
 
-2. Run the one-click installer:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\install.ps1
-   ```
+## Install
 
-3. Launch Antigravity:
-   ```powershell
-   agy
-   ```
-   *Team Kuro is automatically primed and ready on every session!*
+Windows (PowerShell):
+```powershell
+git clone https://github.com/swap-cameroon/kuro-antigravity-config.git
+cd kuro-antigravity-config
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -DryRun   # preview
+powershell -ExecutionPolicy Bypass -File .\install.ps1           # install
+```
+macOS / Linux:
+```bash
+./install.sh --dry-run && ./install.sh
+```
 
----
+The installer is **non-destructive**:
+- validates the repo first (`scripts/validate.py`);
+- backs up replaced folders to `<target>/.kuro-backup/<timestamp>` (last 3 kept);
+- **never overwrites** `config.json`, `hooks.json`, `mcp_config.json` - it only creates them when missing;
+- removes legacy duplicates from older versions, verifies every skill landed, and exits non-zero on failure.
 
-## 📍 Project Continuity & Handover Protocol
+Optional prompt firewall (blocks vague or runaway prompts before they burn tokens):
+```powershell
+.\install.ps1 -EnableInterceptor    # merges a PreInvocation hook into hooks.json, keeps existing hooks
+```
 
-Team Kuro uses a Git-tracked `PROJECT_STATE.md` at the root of every project:
-* **Zero-Token Cold Start**: Kuro reads `PROJECT_STATE.md` on startup, avoiding thousands of tokens spent re-scanning code.
-* **Critical Path (P0)**: Highlights blocking architectural/security dependencies so you or a colleague know what to unblock first.
-* **Domain Roadmap (P1/P2)**: Full backlog by specialty for smooth handoffs.
+### About `config.json`
+Your Antigravity permission settings (auto-execution, sandbox, file access) are personal and security-relevant, so they are **not** part of this repo. `config.example.json` only carries harmless defaults. If you want fewer prompts, tune the permission preset yourself and understand that "turbo / sandbox off / non-workspace access" lets an agent run commands and touch any file without asking.
+
+## Project continuity
+
+Every active project keeps a Git-tracked `PROJECT_STATE.md` ([template](skills/project-state/templates/PROJECT_STATE.md)): active context, verified run commands, in-flight task, next 3 actions, P0 critical path, roadmap by domain, gotchas, gate status. A new session reads it instead of re-crawling the repo and checks it against `git HEAD` so a stale file is never trusted blindly.
+
+## Develop this repo
+
+```bash
+python scripts/validate.py               # frontmatter, name==dir, links, roster, JSON, counts, catalog
+python scripts/validate.py --write-catalog   # regenerate docs/SKILLS.md after adding a skill
+```
+CI runs the same check on every push/PR (`.github/workflows/validate.yml`).
+
+Adding a skill: create `skills/<name>/SKILL.md` with frontmatter `name` (equal to the folder), a routing-quality `description` (what it does and **when to use it**), then assign it to a member in `team/roster.json` and regenerate the catalog.
+
+## Licensing
+
+Most skills are third-party MIT works and keep their original notices; see [NOTICE](NOTICE). Skills authored for this repo (`team-orchestration`, `project-state`, `ui-design-a11y`) are MIT.

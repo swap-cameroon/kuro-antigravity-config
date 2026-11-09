@@ -129,7 +129,7 @@ Add a reference in your customization root's `skills.json`:
 ```json
 {
   "entries": [
-    { "path": "/path/to/token-optimization-skill" }
+    { "path": "/path/to/kuro-antigravity-config/skills/token-saver" }
   ]
 }
 ```
