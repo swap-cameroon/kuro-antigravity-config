@@ -28,5 +28,9 @@ maintainer before redistributing this repository publicly):
   secrets-scanner, security-audit, security-config-review, security-hardening,
   spring-data-jpa, spring-security, spring-testing, token-saver
 
-Skills authored for this repository: team-orchestration, project-state,
-ui-design-a11y (MIT).
+Skills authored for this repository (MIT): team-orchestration, project-state,
+ui-design-a11y, product-requirements, api-design, threat-modeling,
+systematic-debugging, refactoring-legacy, git-workflow-release,
+technical-writing, test-strategy, observability, node-typescript-backend,
+python-fastapi, react-nextjs, mobile-engineering, llm-app-engineering,
+data-engineering.

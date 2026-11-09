@@ -29,7 +29,7 @@ INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
 # Token budgets (1 token ~ 4 chars). Descriptions and rules are paid on EVERY turn; SKILL.md bodies on activation.
 BUDGET_RULES_TOKENS = 1100        # all plugins/*/rules/AGENTS.md combined (error)
-BUDGET_DESCRIPTIONS_TOKENS = 3000  # sum of all skill frontmatter descriptions (error)
+BUDGET_DESCRIPTIONS_TOKENS = 3900  # sum of all skill frontmatter descriptions (error)
 MAX_DESCRIPTION_CHARS = 520       # one description (error)
 WARN_SKILL_MD_TOKENS = 3500       # one SKILL.md body (warning: split into references/)
 # Authored as a single workflow with their own progressive disclosure in sibling folders; not split mechanically.
@@ -180,14 +180,16 @@ def check_json_and_plugins() -> None:
 
 def category(name: str) -> str:
     table = [
-        ("Frontend", ("angular",)),
-        ("Backend & data", ("spring", "postgres", "backend", "http-resilience", "perf")),
+        ("Frontend & mobile", ("angular", "react", "mobile", "ui-design")),
+        ("Backend, data & AI", ("spring", "postgres", "backend", "http-resilience", "perf", "node-",
+                                "python-", "api-design", "data-engineering", "llm-app")),
         ("Security", ("security", "sast", "dast", "pentest", "secrets", "dependency", "compliance",
-                      "remediation", "secure-by")),
-        ("Architecture & product", ("system-design", "first-principles", "spec-miner")),
-        ("Delivery, cloud & reliability", ("devops", "cloud", "sre")),
-        ("Quality", ("code-review", "api-contract")),
-        ("Team & tokens", ("team-", "project-state", "token", "ui-design")),
+                      "remediation", "secure-by", "threat-")),
+        ("Architecture & product", ("system-design", "first-principles", "spec-miner", "product-req")),
+        ("Delivery, cloud & reliability", ("devops", "cloud", "sre", "observability", "git-workflow")),
+        ("Quality & maintenance", ("code-review", "api-contract", "test-strategy", "systematic-",
+                                   "refactoring", "technical-writing")),
+        ("Team & tokens", ("team-", "project-state", "token")),
     ]
     for label, prefixes in table:
         if name.startswith(prefixes):

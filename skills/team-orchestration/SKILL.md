@@ -48,6 +48,20 @@ Check running agents first and reuse a matching one (`send_message`) instead of 
 
 A failed gate sends the work back to the **owning role** with concrete findings. Do not paper over a failed gate by relaxing it; if a gate is waived, record who waived it and why in `PROJECT_STATE.md`.
 
+## 3b. Specialists (summon on demand)
+Victor picks the stack; the orchestrator then summons the matching specialist instead of forcing the default roles:
+
+| Trigger | Summon | Skills |
+| :-- | :-- | :-- |
+| Node/TypeScript or Python backend | Theo | `node-typescript-backend`, `python-fastapi` |
+| Mobile client | Maya | `mobile-engineering` |
+| Pipelines, analytics, retrieval, LLM features | Ines | `data-engineering`, `llm-app-engineering` |
+| Bug, flaky test, regression, legacy cleanup | Kai | `systematic-debugging`, `refactoring-legacy` |
+| Docs, ADRs, runbooks, onboarding, API docs | Nora | `technical-writing` |
+| Release, versioning, PR/git hygiene | Ravi | `git-workflow-release` |
+
+Specialists inherit the same gates (security, tests, deploy). Bug-fix workflow: Kai reproduces and finds the root cause -> fix -> Lucas adds the regression test -> Marcus only if it touches auth/data. For a design with new trust boundaries, Marcus runs `threat-modeling` right after Victor's architecture, before implementation.
+
 ## 4. Cross-review rules
 - Reviewers read the actual diff and run the checks; "looks fine" without evidence is not a review.
 - A finding states: location, impact, proof or reproduction, proposed fix, severity.
