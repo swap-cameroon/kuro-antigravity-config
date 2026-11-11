@@ -31,12 +31,12 @@ Ask a clarifying question only when the answer changes the design and cannot be 
 Subagents start cold. Give each a brief with:
 1. **Identity**: name, title and persona from the roster (`persona.traits`, `persona.voice`). Persona shapes tone and working style only; technical standards and gates are identical for every agent. Also pass the agent's `blind_spot` so peers know what to challenge.
 2. **Goal** in one sentence and the **definition of done**.
-3. **Inputs**: exact files, specs (PRD/ARCHITECTURE sections), decisions already taken.
+3. **Inputs**: exact files, the `AC-n.m` criteria it must satisfy, `CONVENTIONS.md` (project rules outrank skill defaults), the ADRs that constrain it, decisions already taken.
 4. **Skills to read first** (names from the roster; at most 2-3).
 5. **Boundaries**: files/areas it owns, what it must not touch.
 6. **Output format**: diff + short report (what changed, what was run, what is unverified, open risks).
-7. **Model class**: the roster `model_tier` of that agent (`flash` or `pro`); use the closest class your tool offers.
-8. **Ledger task id** when a ledger exists: the agent runs `claim <id> --agent <name>` first, `log "..." --level heartbeat --task <id>` at each step, `set <id> done` after verifying.
+7. **Model class**: the roster `model_tier` of that agent (`flash` or `pro`), resolved to a real model name by `team/config.json` `models` when set. Never downgrade a `pro` role to save tokens.
+8. **Ledger task id and check command** when a ledger exists: the agent runs `claim <id> --agent <name>` first, `log "..." --level heartbeat --task <id>` at each step, `verify <id> --cmd "<tests>"` (the ledger runs it and records the real result), then `set <id> done`.
 
 Check running agents first and reuse a matching one (`send_message`) instead of spawning a duplicate. Run agents in parallel only when their file ownership does not overlap: with a ledger, `next --parallel` returns exactly that batch and `claim` refuses an overlap. Launch the whole batch in one step, not one agent after another.
 
@@ -65,6 +65,8 @@ Order of the waves, generated from `roster.lifecycle`: Ngono -> Njoya -> Kouam +
 | 5 | Tchinda | `UAT_REPORT.md` + `BUG-NNN.md`: independent black-box acceptance by hand in the real UI (`exploratory-testing`) | GO with evidence for every primary journey; no open S1. Builders never self-certify |
 | 6 | Endeley | Production image, CI/CD, IaC, observability, runbook, rollback | Pipeline green; non-root pinned image; rollback and alert path documented |
 | 6 | Nchare (in parallel with Endeley) | Docs: README, API spec, runbooks; `PROJECT_STATE.md` updated | A newcomer can run and deploy from the docs |
+
+Document gates are mechanical (`python <TEAM>/tools/kuro_check.py --root <project> <check>`, `<TEAM>` = `~/.gemini/config/team`): `prd` must pass before wave 3 starts, `adr` before wave 3 ends, `state` at every checkpoint, `conventions` once per project. A failing check goes back to its owner (Ngono, Njoya, Mbarga); it is never waived silently.
 
 Wave 4 reviewers read the same diff at the same time and do not edit product code; their findings go back to the build owners together. After the fixes, re-run only the gates the fix touches (a CSS fix does not re-run the security review). Wave 5 starts only when wave 4 is green.
 
@@ -104,5 +106,7 @@ Specialists inherit the same gates (security, tests, deploy). Bug-fix workflow: 
 - Two agents editing the same file.
 - Briefs that say "continue what we discussed".
 - Scripted debates: assigning stances or the expected solution in briefs, or telling an agent what a peer proposed before the peer answered.
-- Declaring victory without running the tests or build.
+- Declaring victory without running the tests or build, or closing a task with `--force` to get past a failing `verify`.
+- Applying a skill's generic advice against the project's `CONVENTIONS.md`, ADRs or existing patterns.
+- Starting to build on a PRD that fails `kuro_check.py prd`: vague criteria produce vague software.
 - Loading every skill "just in case"; load per task.

@@ -24,13 +24,21 @@ Ledger tool: `python <TEAM>/tools/kuro_ledger.py --root <project> <command>` whe
 1. `next --parallel` lists the runnable tasks that share no file with each other or with work in progress, with owner and model class. Launch that whole batch at once.
 2. Each agent takes its task with `claim T-001 --agent <name>`. The ledger refuses if another agent holds it or if a running task touches the same files, so two agents never edit one file.
 3. While working: `log "<step, progress>" --level heartbeat --task T-001 --agent <name>` at each step; the live board shows it.
-4. When verified: `set T-001 done --agent <name> --note "result" --commit <sha>`; then run `next --parallel` again for the next batch.
+4. Prove, then close: `verify T-001 --agent <name>`, then `set T-001 done --agent <name> --note "result" --commit <sha>`; then run `next --parallel` again for the next batch.
 
 State files have one job each: `.kuro/` is the live task state (minutes), `PROJECT_STATE.md` is the durable handover (milestones, decisions, run commands). Do not copy task lists into `PROJECT_STATE.md`; link to `.kuro/STATUS.md`.
 
+## Quality gates (on by default, `team/config.json` -> `quality`)
+- **No start without acceptance criteria**: `claim` and `set in_progress` refuse a task whose `--acceptance` is empty. Copy the `AC-n.m` ids from the PRD; fix a task with `edit T-001 --acceptance "..."`.
+- **No done without proof**: `set T-001 done` is refused until one of these exists:
+  - `verify T-001 --cmd "<test or build command>"`: the ledger runs the command itself in the project, records the real exit code, duration and the last lines of output. Store the command once with `add --verify "..."` and call `verify T-001` afterwards. A failed verify blocks `done` and notifies the user.
+  - `set T-001 done --evidence "<what was checked by hand, where the proof is>"` for checks no command can make (UAT in a real browser, a visual review).
+- The board and `STATUS.md` label every finished task `verified` (the ledger ran it), `declared` (someone says so) or `forced` (`--force`, logged). Never use `--force` to get past a failing test; reopen the task instead.
+- Proof does not carry over: reopening a task (`claim` again) drops its previous evidence.
+
 ## Write-ahead rule (what makes it crash-proof)
 - **Before** starting a task: `claim T-001 --agent <name> --note "intent / where I will start"` (or `set T-001 in_progress`).
-- **After** finishing: `set T-001 done --note "result" --commit <sha>` (run only after tests were really executed).
+- **After** finishing: `verify T-001 --cmd "<tests>"`, then `set T-001 done --note "result" --commit <sha>`.
 - Any task left `in_progress` after a crash has a note saying where it started; the next session verifies the repo state before trusting it.
 - Decisions, blockers, gate results, errors: `log "<fact>" --level decision|blocker|error|milestone`. Facts only, what really happened.
 
@@ -58,4 +66,4 @@ On any sign of pressure (HTTP 429, RESOURCE_EXHAUSTED, "quota", sharply slower o
 - `.kuro/RESUME.md` is the entry point for a fresh session of any tool.
 
 ## Honesty
-Journal and status contain only observed events. "Done" means verified (tests/build run), not "written". If a notification channel failed or is not configured, say so.
+Journal and status contain only observed events. "Done" means verified (tests/build run by `verify`), not "written"; a `declared` task is reported to the user as declared. If a notification channel failed or is not configured, say so.

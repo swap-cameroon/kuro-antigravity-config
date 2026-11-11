@@ -8,12 +8,14 @@ import unittest
 from pathlib import Path
 
 TOOL = Path(__file__).resolve().parent / "kuro_ledger.py"
-ENV = dict(os.environ, PYTHONUTF8="1", KURO_NOTIFY_CHANNELS="file")   # never pop real toasts in tests
+# never pop real toasts in tests; the quality gates have their own test class below
+ENV = dict(os.environ, PYTHONUTF8="1", KURO_NOTIFY_CHANNELS="file", KURO_QUALITY_GATES="off")
+STRICT = dict(ENV, KURO_QUALITY_GATES="on")
 
 
-def kl(root, *args, check=True):
+def kl(root, *args, check=True, env=None):
     r = subprocess.run([sys.executable, str(TOOL), "--root", str(root), *args], capture_output=True, text=True,
-                       env=ENV, encoding="utf-8", timeout=60)
+                       env=env or ENV, encoding="utf-8", timeout=60)
     if check:
         assert r.returncode == 0, f"{args}: {r.stdout}{r.stderr}"
     return r
@@ -180,6 +182,70 @@ class LedgerTests(unittest.TestCase):
             r = kl(empty, "next", check=False)
             self.assertNotEqual(r.returncode, 0)
             self.assertIn("run:", r.stdout + r.stderr)
+
+
+class QualityGateTests(unittest.TestCase):
+    """With the gates on (the default), a task needs acceptance criteria to start and proof to finish."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = self._tmp.name
+        kl(self.root, "init", "--project", "Demo")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def k(self, *args, check=True):
+        return kl(self.root, *args, check=check, env=STRICT)
+
+    def test_cannot_start_without_acceptance_criteria(self):
+        self.k("add", "--id", "T-1", "--title", "login")
+        r = self.k("claim", "T-1", "--agent", "Kamdem", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no acceptance criteria", r.stdout + r.stderr)
+        self.k("edit", "T-1", "--acceptance", "AC-1.1 login returns a 15 min token")
+        self.k("claim", "T-1", "--agent", "Kamdem")
+
+    def test_done_needs_a_passing_verify(self):
+        self.k("add", "--id", "T-1", "--title", "login", "--acceptance", "AC-1.1")
+        self.k("claim", "T-1", "--agent", "Kamdem")
+        r = self.k("set", "T-1", "done", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("nothing proves it works", r.stdout + r.stderr)
+        fail = self.k("verify", "T-1", "--cmd", f'"{sys.executable}" -c "import sys; print(\'2 failed\'); sys.exit(3)"',
+                      check=False)
+        self.assertNotEqual(fail.returncode, 0)
+        self.assertIn("FAILED (exit 3)", fail.stdout)
+        r = self.k("set", "T-1", "done", check=False)
+        self.assertIn("last verify FAILED", r.stdout + r.stderr)
+        ok = self.k("verify", "T-1", "--cmd", f'"{sys.executable}" -c "print(\'12 passed\')"')
+        self.assertIn("PASSED", ok.stdout)
+        self.k("set", "T-1", "done", "--note", "green")
+        t = tasks(self.root)[0]
+        self.assertEqual((t["status"], t["evidence"]["kind"], t["evidence"]["exit"]), ("done", "run", 0))
+        self.assertIn("12 passed", t["evidence"]["tail"])
+        journal = (Path(self.root) / ".kuro" / "JOURNAL.md").read_text(encoding="utf-8")
+        self.assertIn("T-1 -> done [verified]", journal)
+        self.assertIn("verified", self.k("watch", "--once").stdout)
+
+    def test_manual_check_is_recorded_as_declared_and_force_as_forced(self):
+        self.k("add", "--id", "T-1", "--title", "uat", "--acceptance", "AC-2.1")
+        self.k("add", "--id", "T-2", "--title", "hotfix", "--acceptance", "AC-3.1")
+        self.k("claim", "T-1", "--agent", "Tchinda")
+        self.k("set", "T-1", "done", "--evidence", "ran the 3 journeys by hand in Chrome, screenshots in uat/")
+        self.k("claim", "T-2", "--agent", "Matip")
+        self.k("set", "T-2", "done", "--force")
+        kinds = {t["id"]: t["evidence"]["kind"] for t in tasks(self.root)}
+        self.assertEqual(kinds, {"T-1": "declared", "T-2": "forced"})
+
+    def test_restarting_a_task_drops_old_proof(self):
+        self.k("add", "--id", "T-1", "--title", "a", "--acceptance", "AC-1", "--verify", f'"{sys.executable}" -c "pass"')
+        self.k("claim", "T-1", "--agent", "Kamdem")
+        self.k("verify", "T-1")                                   # uses the command stored on the task
+        self.k("set", "T-1", "blocked", "--note", "review found a bug")
+        self.k("claim", "T-1", "--agent", "Kamdem")
+        r = self.k("set", "T-1", "done", check=False)
+        self.assertNotEqual(r.returncode, 0)
 
 
 if __name__ == "__main__":

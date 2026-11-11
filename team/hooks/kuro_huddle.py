@@ -317,11 +317,17 @@ def waves(roster: dict) -> str:
 def build_message(mode: str, first: bool, tier: str, top, people, gap: bool, cfg: dict, roster: dict) -> str:
     lines = [f"[TEAM KURO HUDDLE | mode={mode} | tier={tier}]"]
     if first:
-        lines.append("SESSION START: load team/roster.json; read PROJECT_STATE.md if present (skill project-state) "
-                     "and greet in 2 lines; keep subagents lazy (spawn on first need, then reuse via manage_subagents).")
+        lines.append("SESSION START: load team/roster.json; read PROJECT_STATE.md and CONVENTIONS.md if present "
+                     "(skill project-state; they outrank skill defaults); greet in 2 lines; spawn subagents lazily "
+                     "and reuse them (manage_subagents).")
     maxp = int(cfg.get("max_participants", 4))
-    models = {m["name"]: m.get("model_tier", "") for m in roster.get("members", [])}
+    named = cfg.get("models", {}) if isinstance(cfg.get("models"), dict) else {}
+    models = {}
+    for m in roster.get("members", []):       # class from the roster, real model name from config when the user set one
+        cls = m.get("model_tier", "")
+        models[m["name"]] = f"{cls}: {named[cls]}" if named.get(cls) else cls
     ledger = (TEAM_DIR / "tools" / "kuro_ledger.py").as_posix()
+
     if top:
         lines.append("Candidate skills: " + ", ".join(n for n, _ in top))
     if people and tier != "SOLO":
@@ -340,15 +346,16 @@ def build_message(mode: str, first: bool, tier: str, top, people, gap: bool, cfg
                      "disjoint files run in parallel). No debate unless a real design choice appears. "
                      "Cross-review by Hayatou or Lukong only if auth, data or a public API changes.")
         lines.append(f'LIVE: if you delegate, `python "{ledger}" --root <project> claim|set` each task so the user '
-                     "can follow with `watch`.")
+                     "can follow with `watch`. PROOF: run the tests or build before saying done (`verify <id> --cmd`).")
     else:
-        lines.append(f"FEATURE: skill team-orchestration. Waves (parallel inside a wave, '+'): {waves(roster)}. "
-                     f"Specialists join the build wave. Briefs = question not answer; debate only real design choices "
-                     f"(blind round, max {rounds} rounds, Njoya decides + ADR).")
+        lines.append(f"FEATURE: skill team-orchestration. Waves ('+' = in parallel): {waves(roster)}. Specialists "
+                     f"join the build wave. Debate only real design choices (blind, max {rounds} rounds, Njoya decides + ADR).")
         if cfg.get("reporter", {}).get("enabled", True):
             lines.append(f'REPORTER: Mbarga keeps the ledger (skill team-reporting; python "{ledger}" --root <project>): '
-                         "plan tasks with files BEFORE work, `next --parallel` gives the batch to launch together, "
-                         "each agent `claim`s then `set done`; tell the user to run `watch` for the live board.")
+                         "plan tasks with files and acceptance first; `next --parallel` = batch to launch together; "
+                         "agents `claim`, `verify`, `set done`; the user follows with `watch`.")
+        lines.append("GATES: `kuro_check.py` (same folder): `prd` before the build wave, `adr` after architecture, "
+                     "`state` at checkpoints; fix a failing check, do not argue with it.")
     if gap and tier in ("FOCUSED", "FEATURE"):
         lines.append("COVERAGE GAP: no skill or team member matches. Follow team-orchestration/references/"
                      "capability-acquisition.md "

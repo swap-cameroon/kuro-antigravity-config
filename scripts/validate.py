@@ -168,7 +168,17 @@ def check_team_config_and_hook() -> None:
         for k in ("max_participants", "max_rounds"):
             if not isinstance(cfg.get(k), int) or cfg[k] < 1:
                 err(f"team/config.json: '{k}' must be a positive integer")
-    for rel in ("team/hooks/kuro_huddle.py", "team/tools/kuro_ledger.py"):
+        models = cfg.get("models", {})
+        if not isinstance(models, dict) or set(models) - {"pro", "flash"} or \
+                any(not isinstance(v, str) for v in models.values()):
+            err("team/config.json: 'models' maps 'pro' and 'flash' to a model name (empty string = let the tool choose)")
+        quality = cfg.get("quality", {})
+        for k in ("require_acceptance", "require_evidence"):
+            if not isinstance(quality.get(k), bool):
+                err(f"team/config.json: 'quality.{k}' must be true or false")
+        if quality.get("require_acceptance") is False or quality.get("require_evidence") is False:
+            warn("team/config.json: a quality gate is switched off in the shipped defaults")
+    for rel in ("team/hooks/kuro_huddle.py", "team/tools/kuro_ledger.py", "team/tools/kuro_check.py"):
         f = ROOT / rel
         if not f.exists():
             err(f"{rel} missing")

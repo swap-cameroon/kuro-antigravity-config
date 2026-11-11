@@ -2,6 +2,15 @@
   "concertation": "auto",
   "max_participants": 4,
   "max_rounds": 2,
+  "models": {
+    "pro": "",
+    "flash": ""
+  },
+  "quality": {
+    "require_acceptance": true,
+    "require_evidence": true,
+    "verify_timeout_seconds": 900
+  },
   "skill_acquisition": "ask",
   "agent_creation": "ask",
   "skill_sources": [

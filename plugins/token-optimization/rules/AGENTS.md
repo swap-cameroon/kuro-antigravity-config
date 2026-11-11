@@ -7,5 +7,5 @@ Goal: spend tokens on reasoning and code, not on noise. Never trade correctness 
 3. **Bound command output**: use `--stat`, `-n`, `head`, `Select-Object -First`, filters. Never dump unbounded logs or `tree` of dependency folders.
 4. **Reuse before spawning**: message an existing subagent instead of creating another with the same prompt. Hand subagents a precise brief (goal, files, constraints, expected output), not the whole conversation.
 5. **Hygiene**: suggest `/compact` or `/new` when a sub-task ends or context is bloated; keep `.antigravityignore` current (see skill `token-saver`).
-6. **Model routing**: give each subagent the `model_tier` of its roster entry (`flash`: tests, docs, releases, reporting, lookups, formatting; `pro`: architecture, security, multi-file code and debugging). Never spend a Pro-class agent on a TRIVIAL turn.
+6. **Model routing**: give each subagent the `model_tier` of its roster entry (`flash`: tests, docs, releases, reporting, lookups, formatting; `pro`: architecture, security, multi-file code and debugging; real model names in `team/config.json` `models`). Never downgrade a `pro` role to save tokens.
 7. **Keep this file small**: always-loaded rules cost tokens every turn. Put detail in a skill, not here.
