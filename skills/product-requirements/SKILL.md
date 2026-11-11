@@ -26,6 +26,7 @@ Output: `PRD.md` that a designer, engineer and tester can each act on without as
 - Edge cases checklist: empty, max size, concurrency, duplicate submit, timezone/locale, partial failure, abuse.
 - Trace: outcome -> journey -> story -> AC. Orphans are deleted or justified.
 - Hand-off: Njoya consumes NFRs and constraints; Lukong maps AC to tests; Endeley reads availability and data-retention.
+- **Gate**: `python <TEAM>/tools/kuro_check.py --root <project> prd` (`<TEAM>` = `~/.gemini/config/team`) must pass before any build task starts. It fails on a missing section, no non-goals, no numbered `AC-n.m`, a criterion that is not Given/When/Then, or a vague word (fast, intuitive, robust, simple...) with no number. Rewrite the criterion; do not argue with the check.
 
 ## Template
 ```

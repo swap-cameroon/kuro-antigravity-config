@@ -26,6 +26,18 @@ Update when a milestone ends, a decision is taken, a blocker appears or clears, 
 - Record decisions and gotchas in **Invariants & gotchas** with the reason.
 - Refresh `Last verified commit` and the date.
 
+## Project conventions (what makes the output yours, not generic)
+`CONVENTIONS.md` at the repo root records how **this** project is written: stack, verified commands, naming, architecture rules, review rules, things never to do. It outranks the generic advice of any skill, and every agent reads it before touching code.
+- Missing on a non-trivial project: draft it from evidence with `python <TEAM>/tools/kuro_check.py --root <project> conventions --init` (reads manifests, lockfiles, linters, CI, commit history). It marks commands `UNVERIFIED` and leaves `TODO(user)` lines.
+- Run each detected command once, then remove the `UNVERIFIED` mark. Ask the user the `TODO(user)` questions in one batch (max 5); never invent a team rule.
+- When the user corrects a style or architecture choice twice, add the rule here so it is not corrected a third time.
+
+## Decisions
+One ADR per load-bearing decision in `docs/adr/NNNN-title.md`, from [templates/ADR.md](templates/ADR.md): status, context, decision, rejected alternatives, consequences. Link them from section 1 of `PROJECT_STATE.md`; never copy them.
+
+## Mechanical check
+`python <TEAM>/tools/kuro_check.py --root <project> state` fails when the file is still a template, holds a secret, has no concrete next action, or names a commit the repo does not know; it warns with the exact `git log` command when HEAD has moved. `... adr` and `... conventions` check the two files above; `... all` runs everything. `<TEAM>` is `~/.gemini/config/team`. Run it at session start and before each checkpoint; fix what fails instead of explaining it away.
+
 ## Quality bar
 - Under ~200 lines; link to ADRs/PRD instead of copying them.
 - **Never store secrets**. Name the variable and where it is obtained (vault, `.env.example`), never its value.

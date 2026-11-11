@@ -17,7 +17,13 @@ Parallel work: `next --parallel` lists runnable tasks that share no file with ea
 progress; each agent `claim`s its task (refused if someone else holds it or files overlap), sends
 `log --level heartbeat --task <id>` while working, then `set <id> done`. `watch` is the user's live board.
 
-Commands: init | add | claim | set | log | status | next | watch | handoff | notify
+Quality gates (team/config.json -> "quality", env KURO_QUALITY_GATES=off to disable):
+  * a task cannot start without acceptance criteria (`add --acceptance`, or `edit <id> --acceptance`)
+  * a task cannot be `done` without proof: `verify <id> --cmd "<test command>"` runs the command itself and
+    records the real exit code, or `set <id> done --evidence "<what was checked by hand>"` for manual checks.
+    The board says which tasks are verified (the ledger ran it) and which are only declared.
+
+Commands: init | add | edit | claim | verify | set | log | status | next | watch | handoff | notify
 """
 from __future__ import annotations
 
@@ -48,6 +54,12 @@ DEFAULT_REPORTER = {
     "ntfy_topic": "",                        # opt-in phone push via ntfy.sh (content leaves your machine)
     "webhook_url": "",                       # opt-in generic webhook (Slack/Discord/Teams-compatible JSON)
     "inline_skill_max_chars": 6000,
+}
+
+DEFAULT_QUALITY = {
+    "require_acceptance": True,      # no task starts without acceptance criteria
+    "require_evidence": True,        # no task is done without a passing `verify` or a declared manual check
+    "verify_timeout_seconds": 900,
 }
 
 SECRET_PATTERNS = [
@@ -109,6 +121,25 @@ def load_config() -> dict:
     if env is not None:
         cfg["channels"] = [c.strip() for c in env.split(",") if c.strip()]
     return cfg
+
+
+def load_quality() -> dict:
+    q = dict(DEFAULT_QUALITY)
+    try:
+        q.update(json.loads((TEAM_DIR / "config.json").read_text(encoding="utf-8")).get("quality", {}))
+    except Exception:
+        pass
+    if os.environ.get("KURO_QUALITY_GATES", "").lower() in ("off", "0", "false", "no"):
+        q["require_acceptance"] = q["require_evidence"] = False
+    return q
+
+
+def proof(t: dict) -> str:
+    """How a done task was proven: 'verified' (the ledger ran the command), 'declared' or 'forced'."""
+    ev = t.get("evidence") or {}
+    if ev.get("kind") == "run" and ev.get("exit") == 0:
+        return "verified"
+    return "declared" if ev.get("kind") == "declared" else "forced" if ev.get("kind") == "forced" else ""
 
 
 def atomic_write(path: Path, text: str) -> None:
@@ -235,6 +266,8 @@ class Ledger:
             if t["status"] == "in_progress":
                 extra = extra or (f"{t.get('agent', '?')} since {t.get('started', '?')}"
                                   + (f"; {t['note']}" if t.get("note") else ""))
+            elif t["status"] == "done" and proof(t):
+                extra = extra or f"[{proof(t)}] {t.get('note', '')}".strip()
             return (f"| {t['id']} | {t['title']} | {t.get('owner', '-')} | {t.get('size', '-')} | {port} | "
                     f"{', '.join(t['deps']) or '-'} | {extra or t.get('note', '')} |")
 
@@ -396,10 +429,15 @@ def build_packet(led: Ledger, data: dict, t: dict, inline_skills: bool) -> str:
                 body = read_skill(s, int(cfg.get("inline_skill_max_chars", 6000)))
                 if body:
                     lines += ["", f"### Playbook: {s}", "", body]
+    if (led.root / "CONVENTIONS.md").is_file():
+        lines.insert(lines.index("## Read first") + 2, "- `CONVENTIONS.md` (project rules: they override generic advice)")
+    check = t.get("verify") or "<test/build command>"
     lines += ["", "## When finished", "",
-              "1. Run the tests/build. Summarize what changed and the real results.",
+              f"1. Prove it: `python \"{TOOL_PATH}\" --root \"{led.root}\" verify {t['id']} --cmd \"{check}\"` "
+              "(the ledger runs the command and records the real exit code).",
               f"2. Record it: `python \"{TOOL_PATH}\" --root \"{led.root}\" set {t['id']} done --note \"<one line>\"` "
-              f"(or write `.kuro/handoff/{t['id']}.result.md` if the command is unavailable).", "",
+              f"(refused without a passing verify; for a check done by hand add `--evidence \"<what you checked>\"`; "
+              f"write `.kuro/handoff/{t['id']}.result.md` if the command is unavailable).", "",
               "## Launch (from the project root; check `<tool> --help` for your permission/model flags)", ""]
     prompt = f"Read {rel} and execute that task completely, following its rules."
     for tool, tpl in LAUNCH.items():
@@ -432,7 +470,7 @@ def cmd_add(a, led: Ledger):
         task = {"id": a.id, "title": a.title, "owner": a.owner or "-", "status": "todo", "deps": deps,
                 "acceptance": a.acceptance or "", "files": [f for f in (a.files or "").split(",") if f],
                 "size": a.size, "portable": a.portable == "yes",
-                "needs": [n for n in (a.needs or "").split(",") if n],
+                "needs": [n for n in (a.needs or "").split(",") if n], "verify": a.verify or "",
                 "skills": [s for s in (a.skills or "").split(",") if s], "note": a.note or "",
                 "created": stamp(), "updated": stamp()}
         if led.has_cycle(data["tasks"] + [task]):
@@ -449,6 +487,9 @@ def start_task(led: Ledger, data: dict, t: dict, agent: str, force: bool) -> Non
     pending = [d for d in t["deps"] if led.get(data, d)["status"] != "done"]
     if pending and not force:
         raise SystemExit(f"{t['id']} depends on unfinished {pending} (use --force to override)")
+    if load_quality()["require_acceptance"] and not (t.get("acceptance") or "").strip() and not force:
+        raise SystemExit(f"{t['id']} has no acceptance criteria: nobody can tell when it is done. Add them with "
+                         f"`edit {t['id']} --acceptance \"...\"` (use --force to override)")
     clash = led.file_conflicts(data, t)
     if clash and not force:
         detail = "; ".join(f"{i} ({', '.join(f)})" for i, f in clash)
@@ -456,8 +497,65 @@ def start_task(led: Ledger, data: dict, t: dict, agent: str, force: bool) -> Non
                          "(use --force to override)")
     t["status"], t["agent"] = "in_progress", agent
     t["started"] = t["heartbeat"] = t["updated"] = stamp()
-    t.pop("finished", None)
-    t.pop("progress", None)
+    for stale in ("finished", "progress", "evidence"):      # proof from an earlier attempt does not carry over
+        t.pop(stale, None)
+
+
+def cmd_edit(a, led: Ledger):
+    with locked(led.dir):
+        data = led.load()
+        t = led.get(data, a.id)
+        changed = []
+        for field in ("title", "owner", "acceptance", "verify", "note"):
+            v = getattr(a, field)
+            if v is not None:
+                t[field] = redact(v)
+                changed.append(field)
+        if a.files is not None:
+            t["files"] = [f for f in a.files.split(",") if f]
+            changed.append("files")
+        if not changed:
+            raise SystemExit("nothing to change")
+        t["updated"] = stamp()
+        led.save(data)
+        led.append_journal("info", a.agent, f"{a.id} edited: {', '.join(changed)}")
+        led.render(data)
+    print(f"{a.id} updated ({', '.join(changed)})")
+
+
+def cmd_verify(a, led: Ledger):
+    """Run the task's check command ourselves and record what really happened."""
+    data = led.load()
+    t = led.get(data, a.id)
+    cmd = a.cmd or t.get("verify")
+    if not cmd:
+        raise SystemExit(f"{a.id} has no check command: pass --cmd \"<test/build command>\"")
+    timeout = int(load_quality().get("verify_timeout_seconds", 900))
+    started = time.time()
+    try:
+        r = subprocess.run(cmd, shell=True, cwd=led.root, capture_output=True, text=True, timeout=timeout,
+                           encoding="utf-8", errors="replace")
+        code, output = r.returncode, (r.stdout or "") + (r.stderr or "")
+    except subprocess.TimeoutExpired as e:
+        code, output = 124, f"timed out after {timeout}s\n" + str(e.stdout or "")
+    tail = redact("\n".join(output.strip().splitlines()[-12:]))[-800:]
+    took = int(time.time() - started)
+    with locked(led.dir):
+        data = led.load()
+        t = led.get(data, a.id)
+        t["evidence"] = {"kind": "run", "cmd": redact(cmd), "exit": code, "when": stamp(), "seconds": took, "tail": tail}
+        if a.cmd and not t.get("verify"):
+            t["verify"] = redact(a.cmd)
+        t["heartbeat"] = t["updated"] = stamp()
+        led.save(data)
+        led.append_journal("info" if code == 0 else "error", a.agent,
+                           f"{a.id} verify {'PASSED' if code == 0 else f'FAILED (exit {code})'} in {took}s: `{cmd}`")
+        led.render(data)
+    print(tail)
+    print(f"\n{a.id} verify {'PASSED' if code == 0 else f'FAILED (exit {code})'} in {took}s")
+    if code != 0:
+        notify(led, "error", f"{a.id} verification failed: {t['title']}")
+        raise SystemExit(1)
 
 
 def cmd_claim(a, led: Ledger):
@@ -487,6 +585,16 @@ def cmd_set(a, led: Ledger):
             pending = [d for d in t["deps"] if led.get(data, d)["status"] != "done"]
             if pending and not a.force:
                 raise SystemExit(f"{a.id} depends on unfinished {pending} (use --force to override)")
+            if a.evidence:
+                t["evidence"] = {"kind": "declared", "text": redact(a.evidence), "when": stamp()}
+            if load_quality()["require_evidence"] and proof(t) not in ("verified", "declared"):
+                if not a.force:
+                    ev = t.get("evidence") or {}
+                    why = (f"its last verify FAILED (exit {ev.get('exit')})" if ev.get("kind") == "run"
+                           else "nothing proves it works")
+                    raise SystemExit(f"{a.id} cannot be done: {why}. Run `verify {a.id} --cmd \"<test command>\"`, "
+                                     f"or pass --evidence \"<what was checked by hand>\" (use --force to override)")
+                t["evidence"] = {"kind": "forced", "when": stamp()}
             t["finished"] = stamp()
         t["status"], t["updated"] = a.status, stamp()
         if a.note:
@@ -495,7 +603,8 @@ def cmd_set(a, led: Ledger):
             t["commit"] = a.commit
         led.save(data)
         level = {"done": "done", "blocked": "blocker"}.get(a.status, "info")
-        led.append_journal(level, a.agent, f"{a.id} -> {a.status}" + (f": {a.note}" if a.note else ""))
+        tag = f" [{proof(t)}]" if a.status == "done" and proof(t) else ""
+        led.append_journal(level, a.agent, f"{a.id} -> {a.status}{tag}" + (f": {a.note}" if a.note else ""))
         led.render(data)
     out = notify(led, level, f"{a.id} {a.status}: {t['title']}") if level != "info" else "-"
     print(f"{a.id} -> {a.status} (notify: {out})")
@@ -561,8 +670,8 @@ def board(led: Ledger, width: int = 100, journal_lines: int = 8) -> str:
         out += [cut(f"  {'*' if t['id'] in batch else ' '} {t['id']:<7} {t.get('owner', '-'):<9} {t['title']}")
                 for t in run[:8]]
     if done:
-        out += ["", "LAST DONE"] + [cut(f"  v {t['id']:<7} {t.get('agent') or t.get('owner', '-'):<9} {t['title']}")
-                                     for t in done[-3:]]
+        out += ["", "LAST DONE"] + [cut(f"  v {t['id']:<7} {t.get('agent') or t.get('owner', '-'):<9} "
+                                        f"{proof(t) or 'unproven':<9} {t['title']}") for t in done[-3:]]
     if led.journal.exists() and journal_lines > 0:
         tail = led.journal.read_text(encoding="utf-8").splitlines()[-journal_lines:]
         out += ["", "JOURNAL"] + [cut("  " + line[2:].replace("**", "")) for line in tail]
@@ -635,12 +744,21 @@ def main(argv=None) -> int:
     p.add_argument("--size", choices=["S", "M", "L"], default="M")
     p.add_argument("--portable", choices=["yes", "no"], default="yes")
     p.add_argument("--needs", help="comma list, e.g. subagents,secrets,browser"); p.add_argument("--skills")
+    p.add_argument("--verify", help="command that proves the task is done, e.g. \"npm test\"")
     p.add_argument("--note"); p.add_argument("--agent", default="Mbarga"); p.set_defaults(fn=cmd_add)
+    p = sp.add_parser("edit", help="change a task (acceptance criteria, files, check command...)")
+    p.add_argument("id"); p.add_argument("--title"); p.add_argument("--owner"); p.add_argument("--acceptance")
+    p.add_argument("--files"); p.add_argument("--verify"); p.add_argument("--note")
+    p.add_argument("--agent", default="Mbarga"); p.set_defaults(fn=cmd_edit)
+    p = sp.add_parser("verify", help="run the task's check command and record the real result")
+    p.add_argument("id"); p.add_argument("--cmd"); p.add_argument("--agent", default="Mbarga")
+    p.set_defaults(fn=cmd_verify)
     p = sp.add_parser("claim", help="take a task atomically (refused if held by someone else or files overlap)")
     p.add_argument("id"); p.add_argument("--agent", required=True); p.add_argument("--note")
     p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_claim)
     p = sp.add_parser("set"); p.add_argument("id"); p.add_argument("status", choices=STATUSES)
     p.add_argument("--note"); p.add_argument("--commit"); p.add_argument("--force", action="store_true")
+    p.add_argument("--evidence", help="what was checked by hand, when no command can prove it")
     p.add_argument("--agent", default="Mbarga"); p.set_defaults(fn=cmd_set)
     p = sp.add_parser("log"); p.add_argument("message"); p.add_argument("--level", choices=LEVELS, default="info")
     p.add_argument("--agent", default="Mbarga"); p.add_argument("--notify", action="store_true")

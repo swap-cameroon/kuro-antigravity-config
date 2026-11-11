@@ -11,7 +11,8 @@ A portable, versioned setup for **Google Antigravity (`agy`)**: a 17-agent engin
 | Skills (on demand) | `skills/` | Domain playbooks - see [docs/SKILLS.md](docs/SKILLS.md) |
 | Team roster | `team/roster.json` | Single source of truth: skills, gate, domain, model class, routing triggers, lifecycle waves |
 | Huddle hook | `team/hooks/kuro_huddle.py` | Routes each instruction to a tier and its owners, with zero model tokens |
-| Ledger and live board | `team/tools/kuro_ledger.py` | Task claims, file-overlap guard, heartbeats, `watch`, handoff packets |
+| Ledger and live board | `team/tools/kuro_ledger.py` | Task claims, file-overlap guard, heartbeats, `watch`, proof before done (`verify`), handoff packets |
+| Quality checks | `team/tools/kuro_check.py` | Mechanical gates on `PRD.md`, ADRs, `PROJECT_STATE.md` and `CONVENTIONS.md` |
 | Handover | `skills/project-state/` | `PROJECT_STATE.md` template + resume/update protocol |
 
 Design rule: **always-loaded files stay tiny; detail lives in skills** that are read only when the task needs them.
@@ -22,9 +23,9 @@ Estimated with 1 token ~ 4 characters (`python scripts/validate.py --report`):
 
 | | Initial import | Now |
 | :-- | --: | --: |
-| Always-on rules (every turn) | ~2,250 | ~1,140 |
+| Always-on rules (every turn) | ~2,250 | ~1,200 |
 | Skill names + descriptions (every turn, if your host lists them) | ~3,880 | ~3,900 (53 skills instead of 35) |
-| **Baseline per turn** | **~6,130** | **~5,040 (-18%)** |
+| **Baseline per turn** | **~6,130** | **~5,100 (-17%)** |
 | Heaviest SKILL.md on activation | ~8,070 | ~5,810 |
 
 The baseline is the small part of the bill. What costs most is a subagent started for nothing, so the huddle hook never asks for one on a rename, a typo, an explanation or a lookup, and in the default `auto` mode it injects nothing at all on those turns.
@@ -143,24 +144,68 @@ Two tasks that list the same file never run at the same time; that is why every 
 - **Session died or quota ran out**: nothing is lost. Tasks left `in_progress` carry a note saying where they started; the next session checks the repo before trusting it.
 - **Continue in another tool** (Claude Code, Codex, opencode): `$K handoff --all-runnable --inline-skills` writes self-contained packets in `.kuro/handoff/` and prints the launch command for each tool. `.kuro/RESUME.md` is the entry point for any fresh session.
 
-### 6. Tune it
+### 6. Get better output, not only faster output
+Routing and parallelism make the team cheaper and quicker. What makes the result **better** is what the team is given and what it is forced to prove. Five levers, each backed by a tool rather than by a promise:
+
+**a. A testable spec.** Ask for the PRD first (`écris le PRD de ...`), then check it:
+```bash
+C="python ~/.gemini/config/team/tools/kuro_check.py --root <project>"
+$C prd
+```
+```text
+PASS prd: section 'scope' present
+FAIL prd: not Given/When/Then: AC-1.2
+FAIL prd: vague words without a number: AC-1.1 (fast, intuitive)
+```
+It fails on a missing section, missing non-goals, no numbered `AC-n.m`, a criterion that is not Given/When/Then, or words like *fast*, *intuitive*, *robust*, *simple* with no number. The ledger then refuses to start a task that has no acceptance criteria.
+
+**b. Your conventions, not generic advice.** Once per project:
+```bash
+$C conventions --init     # drafts CONVENTIONS.md from package.json, pom.xml, pyproject, linters, CI, commit history
+```
+Fill in the `TODO(user)` lines (naming, layers, what you refuse). This file outranks the generic advice of every skill, and each agent reads it before touching code. When you correct the team twice on the same point, have the rule added there.
+
+**c. Decisions written down.** `$C adr` fails when an architecture exists with no ADR, or when an ADR lacks its status, context, decision, rejected alternatives or consequences. The team stops re-debating what was already decided.
+
+**d. A fresh handover.** `$C state` fails when `PROJECT_STATE.md` is still a template, contains a secret, has no next action or names an unknown commit, and tells you how many commits it is behind. `$C all` runs every check.
+
+**e. Proof before "done".** A task cannot be closed on someone's word:
+```bash
+$K verify T-3 --cmd "npm test"          # the ledger runs it and stores exit code, duration, last output lines
+$K set T-3 done                         # refused if the last verify failed or never ran
+$K set T-9 done --evidence "3 journeys run by hand in Chrome, screenshots in uat/"   # manual checks, labelled as such
+```
+The live board labels each finished task `verified`, `declared` or `forced`, so you see at a glance what was actually run.
+
+**f. The right model for the hard parts.** Put your tool's real model names in `team/config.json`:
+```json
+"models": { "pro": "<your strongest model>", "flash": "<your fast model>" }
+```
+The hook then suggests `Njoya (pro: <name>)` for architecture, security, multi-file code and debugging, and the fast model for tests, docs and reporting. Whether a subagent can be pinned to a model depends on your tool; if it cannot, run the whole session on the strong model for FEATURE work.
+
+### 7. Tune it
 | Goal | Setting |
 | :-- | :-- |
 | Fewest tokens (default) | `team/config.json`: `"concertation": "auto"` |
 | A hint on every turn, even trivial ones | `"concertation": "always"` |
 | No team hint at all for one session | env `KURO_CONCERTATION=off` |
 | Fewer agents per request | `"max_participants": 2` |
+| Name the models behind `pro` and `flash` | `"models": {"pro": "...", "flash": "..."}` |
+| Relax a quality gate (not recommended) | `"quality": {"require_acceptance": false, "require_evidence": false}`, or env `KURO_QUALITY_GATES=off` for one session |
+| Longer test runs | `"quality": {"verify_timeout_seconds": 1800}` |
 | Phone or chat notifications | `reporter.channels`: add `ntfy` or `webhook` and set `ntfy_topic` / `webhook_url` (the message leaves your machine) |
 | Route a word to a member | add it, lower-case, to that member's `triggers` in `team/roster.json` |
 | Change who runs in parallel | edit the waves in `roster.lifecycle`, then `python scripts/validate.py` tells you which docs to update |
 
-### 7. When something looks wrong
+### 8. When something looks wrong
 | Symptom | Check |
 | :-- | :-- |
 | No `[TEAM KURO HUDDLE]` on a real task | hook not registered: rerun the installer with the team-hook switch and look at `~/.gemini/config/hooks.json`; or `concertation` is `off` |
 | Subagents on small requests | your installed `team/config.json` still says `always`; or the request matched several domains: add or remove `triggers` |
 | `COVERAGE GAP` | no skill and no member matched; the team will propose to author or acquire a skill and asks before installing anything |
-| `claim` refused | another agent holds the task, or a running task lists the same file; wait, or `--force` if you are sure |
+| `claim` refused | another agent holds the task, a running task lists the same file, or the task has no acceptance criteria (`edit <id> --acceptance "..."`) |
+| `set done` refused | no passing `verify` and no `--evidence`: run the tests through `verify`, fix what fails; `--force` is logged and shown as `forced` |
+| `kuro_check.py prd` fails on a vague word | give the criterion a number ("within 2 seconds", "in 3 clicks") or remove the adjective |
 | `ledger is busy` | a crashed process left `.kuro/.lock`; it is cleared automatically after 30 seconds |
 | `watch` shows nobody working | no task was claimed: the work is running outside the ledger; ask the team to plan it (`skill team-reporting`) |
 
@@ -220,6 +265,8 @@ Every active project keeps a Git-tracked `PROJECT_STATE.md` ([template](skills/p
 python scripts/validate.py               # frontmatter, links, roster, JSON, budgets, catalog, prose vs roster (team size, lifecycle)
 python scripts/validate.py --write-catalog   # regenerate docs/SKILLS.md and docs/TEAM.md after changing a skill or the roster
 python scripts/validate.py --report          # token budget report
+python -m unittest discover -s team/hooks    # huddle routing tests
+python -m unittest discover -s team/tools    # ledger and quality-check tests
 python scripts/split_skill.py <skill> --keep "Section A" --deep "Big section" [--dry-run]   # split an oversized SKILL.md
 ```
 CI runs the same check on every push/PR (`.github/workflows/validate.yml`).
