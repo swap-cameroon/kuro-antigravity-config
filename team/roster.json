@@ -1,27 +1,56 @@
 {
   "team": "Kuro",
   "lifecycle": [
-    "Ngono",
-    "Njoya",
-    "Kouam",
-    "Kamdem",
-    "Hayatou",
-    "Lukong",
-    "Ayuk",
-    "Tchinda",
-    "Endeley"
+    [
+      "Ngono"
+    ],
+    [
+      "Njoya"
+    ],
+    [
+      "Kouam",
+      "Kamdem"
+    ],
+    [
+      "Hayatou",
+      "Lukong",
+      "Ayuk"
+    ],
+    [
+      "Tchinda"
+    ],
+    [
+      "Endeley"
+    ]
   ],
+  "lifecycle_note": "Each inner list is a wave: members of one wave run in parallel (disjoint files for builders; reviewers read the same diff), waves run in order. Specialists replace or join the build wave; Oumarou joins the review wave when SLOs are stated.",
+  "model_tier_note": "Advisory model class per agent: 'pro' for architecture, security, multi-file code and debugging; 'flash' for tests, docs, release notes and reporting. Use the closest class your tool offers.",
   "members": [
     {
       "name": "Ngono",
       "title": "Lead Product & Domain Strategist",
       "tier": "core",
+      "domain": "product",
+      "model_tier": "pro",
       "mission": "Turn vague ideas into testable specs: users, journeys, edge cases, acceptance criteria.",
       "skills": [
         "product-requirements",
         "spec-miner"
       ],
       "optional_skills": [],
+      "triggers": [
+        "prd",
+        "exigence",
+        "requirement",
+        "user story",
+        "cahier des charges",
+        "specification",
+        "critere",
+        "acceptance criteria",
+        "persona",
+        "backlog",
+        "mvp"
+      ],
       "deliverable": "PRD.md",
       "gate": "No implementation starts without acceptance criteria.",
       "persona": {
@@ -40,6 +69,8 @@
       "name": "Njoya",
       "title": "Principal Systems Architect & Critical Problem Solver",
       "tier": "core",
+      "domain": "architecture",
+      "model_tier": "pro",
       "mission": "Challenge assumptions, choose the stack and architecture on evidence, record trade-offs.",
       "skills": [
         "first-principles",
@@ -49,6 +80,19 @@
         "http-resilience",
         "api-design",
         "threat-modeling"
+      ],
+      "triggers": [
+        "architecture",
+        "adr",
+        "conception",
+        "stack",
+        "trade-off",
+        "microservice",
+        "monolithe",
+        "monolith",
+        "scalabilite",
+        "scalability",
+        "system design"
       ],
       "deliverable": "ARCHITECTURE.md + ADRs",
       "gate": "Every load-bearing choice has an ADR with at least one rejected alternative.",
@@ -68,6 +112,8 @@
       "name": "Kouam",
       "title": "Staff UI/UX Engineer",
       "tier": "core",
+      "domain": "frontend",
+      "model_tier": "pro",
       "mission": "Accessible, fast, consistent interfaces: components, state, design system, animations.",
       "skills": [
         "angular-developer",
@@ -78,6 +124,33 @@
       ],
       "optional_skills": [
         "code-reviewer-angular"
+      ],
+      "triggers": [
+        "frontend",
+        "front",
+        "angular",
+        "react",
+        "nextjs",
+        "next.js",
+        "ui",
+        "ux",
+        "composant",
+        "component",
+        "css",
+        "tailwind",
+        "accessibilite",
+        "accessibility",
+        "a11y",
+        "ecran",
+        "formulaire",
+        "responsive",
+        "page",
+        "theme",
+        "dark mode",
+        "bouton",
+        "button",
+        "layout",
+        "design system"
       ],
       "deliverable": "UI code + component docs",
       "gate": "WCAG 2.2 AA checks pass; no unsanitized DOM sinks.",
@@ -97,6 +170,8 @@
       "name": "Kamdem",
       "title": "Lead Backend & Database DBA",
       "tier": "core",
+      "domain": "backend",
+      "model_tier": "pro",
       "mission": "Correct, observable, scalable services and schemas; query and capacity tuning.",
       "skills": [
         "spring-data-jpa",
@@ -108,6 +183,25 @@
         "perf",
         "http-resilience",
         "spring-security"
+      ],
+      "triggers": [
+        "backend",
+        "spring",
+        "java",
+        "jpa",
+        "hibernate",
+        "postgres",
+        "postgresql",
+        "sql",
+        "database",
+        "base de donnees",
+        "migration",
+        "endpoint",
+        "api",
+        "rest",
+        "requete",
+        "query",
+        "schema"
       ],
       "deliverable": "Backend code + migrations",
       "gate": "Migrations are reversible; hot queries have an explain plan.",
@@ -127,6 +221,8 @@
       "name": "Hayatou",
       "title": "Principal Security Architect",
       "tier": "core",
+      "domain": "security",
+      "model_tier": "pro",
       "mission": "Threat-model, audit and harden; block releases that carry exploitable findings.",
       "skills": [
         "security-auditor",
@@ -146,6 +242,30 @@
         "remediation-validator",
         "spring-security"
       ],
+      "triggers": [
+        "securite",
+        "security",
+        "authentification",
+        "authentication",
+        "autorisation",
+        "authorization",
+        "auth",
+        "jwt",
+        "oauth",
+        "vulnerabilite",
+        "vulnerability",
+        "faille",
+        "xss",
+        "csrf",
+        "injection",
+        "secret",
+        "owasp",
+        "pentest",
+        "chiffrement",
+        "encryption",
+        "rgpd",
+        "gdpr"
+      ],
       "deliverable": "Threat model + security review report",
       "gate": "No open critical/high finding and no secret in the diff.",
       "persona": {
@@ -164,6 +284,8 @@
       "name": "Lukong",
       "title": "QA Automation Lead",
       "tier": "core",
+      "domain": "qa",
+      "model_tier": "flash",
       "mission": "Prove behaviour and lead the QA squad (Ayuk E2E, Tchinda UAT, Oumarou load): tests mapped to acceptance criteria, contracts, non-regression.",
       "skills": [
         "test-strategy",
@@ -173,6 +295,23 @@
       ],
       "optional_skills": [
         "perf"
+      ],
+      "triggers": [
+        "test",
+        "unitaire",
+        "unit",
+        "couverture",
+        "coverage",
+        "revue",
+        "review",
+        "qa",
+        "junit",
+        "contrat",
+        "contract",
+        "tdd",
+        "pr",
+        "pull request",
+        "code review"
       ],
       "deliverable": "Test suites + TEST_PLAN.md",
       "gate": "Every acceptance criterion maps to an automated test; for user-facing work the gate also requires Ayuk's E2E suite green on the real stack and Tchinda's UAT sign-off. Backend-only tests never pass it.",
@@ -192,6 +331,8 @@
       "name": "Ayuk",
       "title": "E2E & UI Test Engineer",
       "tier": "core",
+      "domain": "qa",
+      "model_tier": "flash",
       "when": "Any work with a user interface or a full user journey (mandatory for user-facing FEATURE work).",
       "mission": "Automate the PRD journeys in a real browser against the real running stack and prove UI and API agree.",
       "skills": [
@@ -201,6 +342,16 @@
         "ui-design-a11y",
         "test-strategy",
         "api-contract-testing"
+      ],
+      "triggers": [
+        "e2e",
+        "end-to-end",
+        "playwright",
+        "cypress",
+        "selenium",
+        "navigateur",
+        "browser",
+        "parcours"
       ],
       "deliverable": "Playwright suite, run report, traces",
       "gate": "The smoke journey (log in through the UI) and every primary journey pass in a real browser on the real stack; no unexplained console or network error.",
@@ -220,6 +371,8 @@
       "name": "Tchinda",
       "title": "Independent Exploratory & Acceptance (UAT) Tester",
       "tier": "core",
+      "domain": "qa",
+      "model_tier": "flash",
       "when": "Before any release of user-facing work; also to triage a customer-reported defect.",
       "mission": "Act as the customer: use the real app by hand, black box, find what builders and their tests missed, and sign off or refuse.",
       "skills": [
@@ -228,6 +381,13 @@
       "optional_skills": [
         "e2e-testing",
         "ui-design-a11y"
+      ],
+      "triggers": [
+        "recette",
+        "uat",
+        "exploratoire",
+        "exploratory",
+        "acceptance"
       ],
       "deliverable": "UAT_REPORT.md (GO/NO-GO with evidence) and BUG-NNN.md reports",
       "gate": "Every primary journey executed by hand in the real UI with evidence; no open S1; builders never self-certify.",
@@ -247,6 +407,8 @@
       "name": "Endeley",
       "title": "Staff DevOps, Cloud & SRE Engineer",
       "tier": "core",
+      "domain": "ops",
+      "model_tier": "pro",
       "mission": "Reproducible builds, safe deploys, observability, SLOs and incident readiness.",
       "skills": [
         "devops-engineer",
@@ -255,6 +417,32 @@
         "observability"
       ],
       "optional_skills": [],
+      "triggers": [
+        "deploiement",
+        "deployment",
+        "deploy",
+        "deployer",
+        "docker",
+        "kubernetes",
+        "k8s",
+        "ci",
+        "cd",
+        "ci/cd",
+        "terraform",
+        "cloud",
+        "aws",
+        "gcp",
+        "azure",
+        "monitoring",
+        "observabilite",
+        "observability",
+        "sre",
+        "incident",
+        "production",
+        "helm",
+        "conteneur",
+        "container"
+      ],
       "deliverable": "Dockerfile, CI/CD, IaC, dashboards, runbooks",
       "gate": "Pipeline is green, image is non-root and pinned, rollback and alerts are documented.",
       "persona": {
@@ -273,6 +461,8 @@
       "name": "Ondoua",
       "title": "Senior Fullstack Engineer (Node/TypeScript & Python)",
       "tier": "specialist",
+      "domain": "backend",
+      "model_tier": "pro",
       "when": "Njoya selects a Node/TypeScript or Python backend instead of Spring.",
       "mission": "Ship production services in Node/TS or Python with the same gates as the Spring stack.",
       "skills": [
@@ -282,6 +472,17 @@
       "optional_skills": [
         "api-design",
         "postgres"
+      ],
+      "triggers": [
+        "node",
+        "nodejs",
+        "node.js",
+        "express",
+        "nestjs",
+        "fastapi",
+        "python",
+        "django",
+        "flask"
       ],
       "deliverable": "Backend service + tests",
       "gate": "Strict typing, boundary validation, no blocking calls on hot paths.",
@@ -301,6 +502,8 @@
       "name": "Bouba",
       "title": "Mobile Lead (Flutter, React Native, native)",
       "tier": "specialist",
+      "domain": "mobile",
+      "model_tier": "pro",
       "when": "The product has a mobile client.",
       "mission": "Fast, offline-capable, secure mobile apps and a safe store release process.",
       "skills": [
@@ -309,6 +512,16 @@
       "optional_skills": [
         "ui-design-a11y",
         "react-nextjs"
+      ],
+      "triggers": [
+        "mobile",
+        "flutter",
+        "android",
+        "ios",
+        "react native",
+        "swift",
+        "kotlin",
+        "apk"
       ],
       "deliverable": "Mobile app + release pipeline",
       "gate": "Secrets in Keychain/Keystore, cold-start budget met, staged rollout configured.",
@@ -328,6 +541,8 @@
       "name": "Manga",
       "title": "Data & AI Engineer",
       "tier": "specialist",
+      "domain": "data",
+      "model_tier": "pro",
       "when": "The work involves pipelines, analytics, retrieval or LLM features.",
       "mission": "Reliable pipelines and LLM features with evals, quality tests and cost control.",
       "skills": [
@@ -337,6 +552,23 @@
       "optional_skills": [
         "postgres",
         "observability"
+      ],
+      "triggers": [
+        "etl",
+        "elt",
+        "analytics",
+        "llm",
+        "rag",
+        "embedding",
+        "prompt",
+        "ia",
+        "machine learning",
+        "dataset",
+        "airflow",
+        "dbt",
+        "spark",
+        "entrepot",
+        "warehouse"
       ],
       "deliverable": "Pipelines, data contracts, eval suite",
       "gate": "Idempotent and backfillable jobs; LLM features have a regression eval and injection tests.",
@@ -356,6 +588,8 @@
       "name": "Matip",
       "title": "Reliability Debugger & Refactoring Specialist",
       "tier": "specialist",
+      "domain": "debug",
+      "model_tier": "pro",
       "when": "A bug, flaky test, regression or legacy cleanup needs evidence-driven work.",
       "mission": "Find root causes with evidence and restructure code without changing behaviour.",
       "skills": [
@@ -364,6 +598,31 @@
       ],
       "optional_skills": [
         "spec-miner"
+      ],
+      "triggers": [
+        "bug",
+        "bogue",
+        "erreur",
+        "error",
+        "exception",
+        "crash",
+        "plante",
+        "plantage",
+        "echoue",
+        "echec",
+        "fail",
+        "failing",
+        "flaky",
+        "regression",
+        "debug",
+        "debugger",
+        "refactor",
+        "refactoring",
+        "refactoriser",
+        "legacy",
+        "stacktrace",
+        "nullpointerexception",
+        "traceback"
       ],
       "deliverable": "Root-cause report + regression test, or behaviour-preserving refactor",
       "gate": "Failure reproduced before the fix; characterization tests pass before and after refactors.",
@@ -383,6 +642,8 @@
       "name": "Nchare",
       "title": "Technical Writer & Developer Experience Lead",
       "tier": "specialist",
+      "domain": "docs",
+      "model_tier": "flash",
       "when": "Docs, ADRs, runbooks, onboarding or API docs are needed or stale.",
       "mission": "Docs a newcomer can follow: accurate, tested, and maintained with the code.",
       "skills": [
@@ -390,6 +651,16 @@
       ],
       "optional_skills": [
         "api-design"
+      ],
+      "triggers": [
+        "documentation",
+        "doc",
+        "readme",
+        "runbook",
+        "tutoriel",
+        "tutorial",
+        "guide",
+        "onboarding"
       ],
       "deliverable": "README, ADRs, runbooks, API docs",
       "gate": "Every documented command was run on a clean environment.",
@@ -409,6 +680,8 @@
       "name": "Ndumbe",
       "title": "Release & Engineering Excellence Manager",
       "tier": "specialist",
+      "domain": "release",
+      "model_tier": "flash",
       "when": "Preparing a release, reviewing PRs, or fixing git history and versioning.",
       "mission": "Predictable, reversible releases with clean history, changelogs and semantic versions.",
       "skills": [
@@ -417,6 +690,19 @@
       "optional_skills": [
         "dependency-audit",
         "secrets-scanner"
+      ],
+      "triggers": [
+        "release",
+        "version",
+        "tag",
+        "changelog",
+        "git",
+        "commit",
+        "merge",
+        "branche",
+        "branch",
+        "rebase",
+        "semver"
       ],
       "deliverable": "Release notes, tag, changelog",
       "gate": "Main is green, version bump matches the change types, rollback documented.",
@@ -436,6 +722,8 @@
       "name": "Mbarga",
       "title": "Team Reporter & Continuity Officer",
       "tier": "support",
+      "domain": "reporting",
+      "model_tier": "flash",
       "when": "FEATURE-tier work, long tasks, or any risk of losing the session or the token quota.",
       "mission": "Keep the user informed and the work resumable: task ledger, journal, notifications and handoff packets for other agentic tools.",
       "skills": [
@@ -444,6 +732,16 @@
       "optional_skills": [
         "project-state",
         "git-workflow-release"
+      ],
+      "triggers": [
+        "avancement",
+        "progress",
+        "rapport",
+        "handoff",
+        "reprise",
+        "ledger",
+        "statut",
+        "status"
       ],
       "deliverable": ".kuro/ ledger (tasks.json, JOURNAL.md, STATUS.md, RESUME.md, handoff/) + notifications",
       "gate": "Ledger is updated before and after each task; every handoff packet is self-contained; nothing is reported as done without verification.",
@@ -463,6 +761,8 @@
       "name": "Oumarou",
       "title": "Performance & Resilience Tester",
       "tier": "specialist",
+      "domain": "qa",
+      "model_tier": "flash",
       "when": "The brief states load, latency, availability or capacity requirements, or before a launch with real traffic.",
       "mission": "Know the capacity before the crossing: load, stress and failure-mode tests against explicit SLOs.",
       "skills": [
@@ -472,6 +772,20 @@
         "http-resilience",
         "backend-performance-review",
         "observability"
+      ],
+      "triggers": [
+        "charge",
+        "load",
+        "stress",
+        "latence",
+        "latency",
+        "slo",
+        "capacite",
+        "capacity",
+        "k6",
+        "jmeter",
+        "gatling",
+        "locust"
       ],
       "deliverable": "Load test scripts, results vs SLO, failure-mode report",
       "gate": "SLOs hold at twice the expected peak and the system degrades gracefully when the database or a dependency is slow or down.",

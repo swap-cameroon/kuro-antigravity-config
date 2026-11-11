@@ -13,7 +13,11 @@ token quota or a switch to another agentic tool:
 Agents call this script instead of hand-editing JSON (atomic writes, locking, validation, redaction).
 Pure standard library. Usage:  python kuro_ledger.py [--root DIR] <command> ...
 
-Commands: init | add | set | log | status | next | handoff | notify
+Parallel work: `next --parallel` lists runnable tasks that share no file with each other or with work in
+progress; each agent `claim`s its task (refused if someone else holds it or files overlap), sends
+`log --level heartbeat --task <id>` while working, then `set <id> done`. `watch` is the user's live board.
+
+Commands: init | add | claim | set | log | status | next | watch | handoff | notify
 """
 from __future__ import annotations
 
@@ -68,7 +72,30 @@ def now() -> dt.datetime:
 
 
 def stamp() -> str:
-    return now().strftime("%Y-%m-%d %H:%M")
+    return now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def age(ts: str | None) -> str:
+    """'3m12s' since a stamp() value; '-' when unknown."""
+    try:
+        sec = int((dt.datetime.now() - dt.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")).total_seconds())
+    except (TypeError, ValueError):
+        return "-"
+    sec = max(sec, 0)
+    if sec < 60:
+        return f"{sec}s"
+    if sec < 3600:
+        return f"{sec // 60}m{sec % 60:02d}s"
+    return f"{sec // 3600}h{sec % 3600 // 60:02d}m"
+
+
+def model_tier(owner: str) -> str:
+    """Advisory model class for a roster member ('' when unknown)."""
+    try:
+        roster = json.loads((TEAM_DIR / "roster.json").read_text(encoding="utf-8"))
+        return next((m.get("model_tier", "") for m in roster.get("members", []) if m["name"] == owner), "")
+    except Exception:
+        return ""
 
 
 def load_config() -> dict:
@@ -146,6 +173,34 @@ class Ledger:
         return [t for t in data["tasks"] if t["status"] == "todo" and all(d in done for d in t["deps"])]
 
     @staticmethod
+    def file_conflicts(data: dict, t: dict) -> list[tuple[str, list[str]]]:
+        """In-progress tasks (other than t) that touch one of t's files: [(task id, shared files)]."""
+        mine = set(t.get("files", []))
+        out = []
+        for o in data["tasks"]:
+            if o["id"] != t["id"] and o["status"] == "in_progress":
+                both = sorted(mine & set(o.get("files", [])))
+                if both:
+                    out.append((o["id"], both))
+        return out
+
+    @classmethod
+    def parallel_batch(cls, data: dict) -> list[dict]:
+        """Runnable tasks that can start together: no shared file with each other or with work in progress."""
+        taken: set[str] = set()
+        for o in data["tasks"]:
+            if o["status"] == "in_progress":
+                taken |= set(o.get("files", []))
+        batch = []
+        for t in cls.runnable(data):
+            files = set(t.get("files", []))
+            if files & taken:
+                continue
+            taken |= files
+            batch.append(t)
+        return batch
+
+    @staticmethod
     def has_cycle(tasks: list[dict]) -> bool:
         deps = {t["id"]: t["deps"] for t in tasks}
         state: dict[str, int] = {}
@@ -177,6 +232,9 @@ class Ledger:
 
         def row(t: dict, extra: str = "") -> str:
             port = "yes" if t.get("portable") else "no"
+            if t["status"] == "in_progress":
+                extra = extra or (f"{t.get('agent', '?')} since {t.get('started', '?')}"
+                                  + (f"; {t['note']}" if t.get("note") else ""))
             return (f"| {t['id']} | {t['title']} | {t.get('owner', '-')} | {t.get('size', '-')} | {port} | "
                     f"{', '.join(t['deps']) or '-'} | {extra or t.get('note', '')} |")
 
@@ -193,7 +251,11 @@ class Ledger:
         out += [f"## Done ({len(done)})", ""]
         out += ([head] + [row(t) for t in done[-15:]]) if done else ["_none_"]
         launch = [t for t in run if t.get("portable")]
-        out += ["", "## Launch elsewhere", "",
+        batch = self.parallel_batch(data)
+        out += ["", "## Parallel batch", "",
+                "Can start together now (no shared files): " + (", ".join(t["id"] for t in batch) or "none") + ".",
+                f"Live board: `python \"{TOOL_PATH}\" --root \"{self.root}\" watch`",
+                "", "## Launch elsewhere", "",
                 "Portable and runnable now: " + (", ".join(t["id"] for t in launch) or "none") + ".",
                 f"Generate packets: `python \"{TOOL_PATH}\" --root \"{self.root}\" handoff --all-runnable`",
                 "Packets land in `.kuro/handoff/`; each lists launch commands for Claude Code, Codex, opencode and agy.", ""]
@@ -209,7 +271,8 @@ class Ledger:
                 "1. Read `.kuro/STATUS.md` (what is done, blocked, runnable) and `PROJECT_STATE.md` if present.",
                 "2. Pick a runnable task (dependencies done). Read its packet in `.kuro/handoff/<id>.md` "
                 f"(create with `python \"{TOOL_PATH}\" --root \"{self.root}\" handoff <id>`).",
-                f"3. Mark progress with `python \"{TOOL_PATH}\" --root \"{self.root}\" set <id> in_progress|done|blocked --note \"...\"`.",
+                f"3. Take it with `python \"{TOOL_PATH}\" --root \"{self.root}\" claim <id> --agent <you>`, "
+                "then `set <id> done|blocked --note \"...\"`.",
                 "4. Do not redo `done` tasks. Verify claims by running tests, not by trusting notes.", "",
                 f"Overall progress: {pct}%.", "", "## Last journal entries", ""] + (tail or ["_empty_"])
         atomic_write(self.dir / "RESUME.md", "\n".join(text) + "\n")
@@ -313,7 +376,8 @@ def build_packet(led: Ledger, data: dict, t: dict, inline_skills: bool) -> str:
     branch = t.get("branch") or f"kuro/{t['id'].lower()}"
     rel = f".kuro/handoff/{t['id']}.md"
     lines = [f"# Handoff {t['id']}: {t['title']}", "",
-             f"- Project: {data.get('project', '')}   Owner role: {t.get('owner', '-')}   Size: {t.get('size', '-')}",
+             f"- Project: {data.get('project', '')}   Owner role: {t.get('owner', '-')}   Size: {t.get('size', '-')}"
+             + (f"   Suggested model class: {model_tier(t.get('owner', ''))}" if model_tier(t.get("owner", "")) else ""),
              f"- Suggested branch: `{branch}`",
              f"- Dependencies: {', '.join(t['deps']) or 'none'}"
              + (f"  **UNMET: {', '.join(unmet)} (do not start before they are done)**" if unmet else "  (all done)"),
@@ -380,14 +444,50 @@ def cmd_add(a, led: Ledger):
     print(f"added {a.id}")
 
 
+def start_task(led: Ledger, data: dict, t: dict, agent: str, force: bool) -> None:
+    """Shared by `claim` and `set in_progress`: dependencies done, no file shared with running work."""
+    pending = [d for d in t["deps"] if led.get(data, d)["status"] != "done"]
+    if pending and not force:
+        raise SystemExit(f"{t['id']} depends on unfinished {pending} (use --force to override)")
+    clash = led.file_conflicts(data, t)
+    if clash and not force:
+        detail = "; ".join(f"{i} ({', '.join(f)})" for i, f in clash)
+        raise SystemExit(f"{t['id']} shares files with in-progress {detail}: run them one after the other "
+                         "(use --force to override)")
+    t["status"], t["agent"] = "in_progress", agent
+    t["started"] = t["heartbeat"] = t["updated"] = stamp()
+    t.pop("finished", None)
+    t.pop("progress", None)
+
+
+def cmd_claim(a, led: Ledger):
+    with locked(led.dir):
+        data = led.load()
+        t = led.get(data, a.id)
+        if t["status"] == "in_progress" and t.get("agent") != a.agent and not a.force:
+            raise SystemExit(f"{a.id} is already held by {t.get('agent', '?')} since {t.get('started', '?')}")
+        if t["status"] == "done" and not a.force:
+            raise SystemExit(f"{a.id} is already done")
+        start_task(led, data, t, a.agent, a.force)
+        if a.note:
+            t["note"] = redact(a.note)
+        led.save(data)
+        led.append_journal("info", a.agent, f"{a.id} claimed: {t['title']}" + (f" ({a.note})" if a.note else ""))
+        led.render(data)
+    print(f"{a.id} claimed by {a.agent}")
+
+
 def cmd_set(a, led: Ledger):
     with locked(led.dir):
         data = led.load()
         t = led.get(data, a.id)
-        if a.status in ("in_progress", "done"):
+        if a.status == "in_progress":
+            start_task(led, data, t, a.agent, a.force)
+        elif a.status == "done":
             pending = [d for d in t["deps"] if led.get(data, d)["status"] != "done"]
             if pending and not a.force:
                 raise SystemExit(f"{a.id} depends on unfinished {pending} (use --force to override)")
+            t["finished"] = stamp()
         t["status"], t["updated"] = a.status, stamp()
         if a.note:
             t["note"] = redact(a.note)
@@ -404,7 +504,13 @@ def cmd_set(a, led: Ledger):
 def cmd_log(a, led: Ledger):
     with locked(led.dir):
         data = led.load()
-        led.append_journal(a.level, a.agent, a.message)
+        if a.task:
+            t = led.get(data, a.task)
+            t["heartbeat"] = stamp()
+            if a.level == "heartbeat":
+                t["progress"] = redact(a.message)[:120]
+            led.save(data)
+        led.append_journal(a.level, a.agent, (f"{a.task}: " if a.task else "") + a.message)
         led.render(data)
     out = notify(led, a.level, a.message, force=a.notify)
     print(f"logged (notify: {out})")
@@ -419,8 +525,72 @@ def cmd_status(a, led: Ledger):
 
 def cmd_next(a, led: Ledger):
     data = led.load()
-    for t in led.runnable(data):
-        print(f"{t['id']}\t{t.get('owner', '-')}\tportable={'yes' if t.get('portable') else 'no'}\t{t['title']}")
+    for t in (led.parallel_batch(data) if a.parallel else led.runnable(data)):
+        tier = model_tier(t.get("owner", ""))
+        print(f"{t['id']}\t{t.get('owner', '-')}" + (f" ({tier})" if tier else "")
+              + f"\tportable={'yes' if t.get('portable') else 'no'}\t{t['title']}")
+
+
+def board(led: Ledger, width: int = 100, journal_lines: int = 8) -> str:
+    """One screen for the user: who is doing what right now, what is stuck, what comes next."""
+    data = led.load()
+    tasks = data["tasks"]
+    done = [t for t in tasks if t["status"] == "done"]
+    pct = int(100 * len(done) / len(tasks)) if tasks else 0
+    bar = "#" * (pct * 30 // 100) + "-" * (30 - pct * 30 // 100)
+
+    def cut(x: str) -> str:
+        return x if len(x) <= width else x[:width - 1] + "~"
+
+    out = [f"TEAM KURO - {data.get('project', 'project')}   {stamp()}",
+           f"[{bar}] {len(done)}/{len(tasks)} done ({pct}%)", "",
+           "NOW (agent | task | running for | last sign of life)"]
+    running = [t for t in tasks if t["status"] == "in_progress"]
+    for t in running:
+        out.append(cut(f"  > {t.get('agent', '?'):<9} {t['id']:<7} {t['title'][:40]:<40} {age(t.get('started')):>8}   "
+                       f"{age(t.get('heartbeat'))} ago" + (f"  {t['progress']}" if t.get("progress") else "")))
+    if not running:
+        out.append("  (nobody is working)")
+    blocked = [t for t in tasks if t["status"] == "blocked"]
+    if blocked:
+        out += ["", "BLOCKED"] + [cut(f"  ! {t['id']:<7} {t['title'][:40]:<40} {t.get('note', '')}") for t in blocked]
+    batch = {t["id"] for t in led.parallel_batch(data)}
+    run = led.runnable(data)
+    if run:
+        out += ["", "NEXT (* = can start in parallel right now)"]
+        out += [cut(f"  {'*' if t['id'] in batch else ' '} {t['id']:<7} {t.get('owner', '-'):<9} {t['title']}")
+                for t in run[:8]]
+    if done:
+        out += ["", "LAST DONE"] + [cut(f"  v {t['id']:<7} {t.get('agent') or t.get('owner', '-'):<9} {t['title']}")
+                                     for t in done[-3:]]
+    if led.journal.exists() and journal_lines > 0:
+        tail = led.journal.read_text(encoding="utf-8").splitlines()[-journal_lines:]
+        out += ["", "JOURNAL"] + [cut("  " + line[2:].replace("**", "")) for line in tail]
+    return "\n".join(out)
+
+
+def cmd_watch(a, led: Ledger):
+    """Live board in a second terminal. Read-only: never takes the lock, so it cannot slow the agents down."""
+    if not led.exists():
+        raise SystemExit(f"no ledger in {led.dir} - run: kuro_ledger.py --root {led.root} init")
+    try:
+        width = os.get_terminal_size().columns
+    except OSError:
+        width = 120
+    while True:
+        try:
+            text = board(led, width, a.journal)
+        except (json.JSONDecodeError, OSError):
+            text = "(ledger is being written, retrying)"
+        if a.once:
+            print(text)
+            return
+        sys.stdout.write("\x1b[2J\x1b[H" + text + f"\n\n(refresh {a.interval}s, Ctrl+C to quit)\n")
+        sys.stdout.flush()
+        try:
+            time.sleep(a.interval)
+        except KeyboardInterrupt:
+            return
 
 
 def cmd_handoff(a, led: Ledger):
@@ -466,13 +636,23 @@ def main(argv=None) -> int:
     p.add_argument("--portable", choices=["yes", "no"], default="yes")
     p.add_argument("--needs", help="comma list, e.g. subagents,secrets,browser"); p.add_argument("--skills")
     p.add_argument("--note"); p.add_argument("--agent", default="Mbarga"); p.set_defaults(fn=cmd_add)
+    p = sp.add_parser("claim", help="take a task atomically (refused if held by someone else or files overlap)")
+    p.add_argument("id"); p.add_argument("--agent", required=True); p.add_argument("--note")
+    p.add_argument("--force", action="store_true"); p.set_defaults(fn=cmd_claim)
     p = sp.add_parser("set"); p.add_argument("id"); p.add_argument("status", choices=STATUSES)
     p.add_argument("--note"); p.add_argument("--commit"); p.add_argument("--force", action="store_true")
     p.add_argument("--agent", default="Mbarga"); p.set_defaults(fn=cmd_set)
     p = sp.add_parser("log"); p.add_argument("message"); p.add_argument("--level", choices=LEVELS, default="info")
-    p.add_argument("--agent", default="Mbarga"); p.add_argument("--notify", action="store_true"); p.set_defaults(fn=cmd_log)
+    p.add_argument("--agent", default="Mbarga"); p.add_argument("--notify", action="store_true")
+    p.add_argument("--task", help="task id this entry is about (refreshes its heartbeat on the live board)")
+    p.set_defaults(fn=cmd_log)
     sp.add_parser("status").set_defaults(fn=cmd_status)
-    sp.add_parser("next").set_defaults(fn=cmd_next)
+    p = sp.add_parser("next")
+    p.add_argument("--parallel", action="store_true", help="only tasks that can start together (no shared files)")
+    p.set_defaults(fn=cmd_next)
+    p = sp.add_parser("watch", help="live board: who is doing what, refreshed in place")
+    p.add_argument("--interval", type=float, default=2.0); p.add_argument("--once", action="store_true")
+    p.add_argument("--journal", type=int, default=8, help="journal lines to show"); p.set_defaults(fn=cmd_watch)
     p = sp.add_parser("handoff"); p.add_argument("id", nargs="?"); p.add_argument("--all-runnable", action="store_true")
     p.add_argument("--include-non-portable", action="store_true")
     p.add_argument("--tool", choices=list(LAUNCH) + ["all"], default="all")

@@ -1,0 +1,37 @@
+{
+  "concertation": "auto",
+  "max_participants": 4,
+  "max_rounds": 2,
+  "skill_acquisition": "ask",
+  "agent_creation": "ask",
+  "skill_sources": [
+    "https://github.com/swap-cameroon/kuro-antigravity-config"
+  ],
+  "allowed_licenses": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0"
+  ],
+  "reporter": {
+    "enabled": true,
+    "channels": [
+      "file",
+      "toast"
+    ],
+    "notify_on": [
+      "milestone",
+      "done",
+      "blocker",
+      "error",
+      "quota",
+      "decision"
+    ],
+    "min_interval_seconds": 120,
+    "ntfy_topic": "",
+    "webhook_url": "",
+    "inline_skill_max_chars": 6000
+  }
+}

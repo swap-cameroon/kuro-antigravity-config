@@ -1,5 +1,5 @@
 {
   "name": "team-kuro",
-  "version": "2.0.0",
-  "description": "Team Kuro: a 7-role autonomous engineering team with gated lifecycle, skill routing and project-state handover"
+  "version": "2.1.0",
+  "description": "Team Kuro: a multi-agent engineering team with tiered routing, parallel gated waves, a live task ledger and project-state handover"
 }

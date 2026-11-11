@@ -8,7 +8,9 @@
     * backs up whatever it is about to replace into <target>\.kuro-backup\<timestamp>
     * NEVER overwrites config.json, hooks.json or mcp_config.json (your machine-specific settings);
       it only creates them when missing
-    * removes known legacy paths from earlier Kuro versions
+    * removes known legacy paths from earlier Kuro versions, and skills that a previous install put there
+      but the repo no longer ships (tracked in <target>\.kuro-manifest); skills you added yourself are kept
+    * keeps your tuned team\config.json (the repo copy is only used when none exists)
     * verifies the result and exits non-zero on failure
 
 .PARAMETER TargetDir
@@ -104,14 +106,33 @@ foreach ($l in $legacy) {
     $p = Join-Path $TargetDir $l
     if (Test-Path $p) { Act "remove legacy $l"; if (-not $DryRun) { Remove-Item -Recurse -Force $p } }
 }
+# Skills installed by a previous run but no longer shipped: remove them (skills you added yourself are not listed
+# in the manifest, so they are never touched).
+$manifest = Join-Path $TargetDir ".kuro-manifest"
+$shipped = @((Get-ChildItem (Join-Path $repo "skills") -Directory).Name)
+if (Test-Path $manifest) {
+    foreach ($old in (Get-Content $manifest | Where-Object { $_ -and ($shipped -notcontains $_) })) {
+        $p = Join-Path $TargetDir "skills\$old"
+        if (Test-Path $p) { Act "remove retired skill $old"; if (-not $DryRun) { Remove-Item -Recurse -Force $p } }
+    }
+}
+# team\config.json holds your tuning (concertation mode, notification channels): keep it across installs.
+$teamCfg = Join-Path $TargetDir "team\config.json"
+$keptCfg = if (Test-Path $teamCfg) { Get-Content $teamCfg -Raw } else { $null }
 foreach ($d in $managed) {
     Act "copy $d\"
     if (-not $DryRun) {
         $dest = Join-Path $TargetDir $d
         New-Item -ItemType Directory -Force -Path $dest | Out-Null
         Copy-Item -Recurse -Force (Join-Path $repo "$d\*") $dest
+        Get-ChildItem $dest -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
     }
 }
+if ($null -ne $keptCfg) {
+    Ok "team\config.json exists - your settings are kept"
+    if (-not $DryRun) { [System.IO.File]::WriteAllText($teamCfg, $keptCfg) }
+}
+if (-not $DryRun) { Set-Content -Path $manifest -Value $shipped -Encoding UTF8 }
 
 # 5. Machine-specific config: create-if-missing only --------------------------
 Info "`n[5/6] Base configuration (never overwritten)"

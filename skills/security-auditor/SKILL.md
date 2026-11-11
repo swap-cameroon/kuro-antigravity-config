@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: "Dedicated attacker-minded security audit when security is the primary concern: static analysis (OWASP 2025), access control and authorization, pen-test patterns. Use for 'security audit', 'pentest', 'vulnerability scan', 'audit before deploy', IDOR, SSRF, injection, privilege escalation, multi-tenancy isolation, threat model. Goes deeper than the code-reviewer security pillar."
+description: "Attacker-minded manual security review of a feature, diff or service: static analysis (OWASP 2025), access control and authorization, pen-test patterns. Use for 'security review', 'audit before deploy', IDOR, SSRF, injection, privilege escalation, multi-tenancy isolation. Deeper than the code-reviewer security pillar; for a whole-project scan use security-audit."
 license: MIT
 metadata:
   author: Marwen Amamou | amamoumarwen@gmail.com

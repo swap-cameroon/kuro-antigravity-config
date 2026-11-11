@@ -1,6 +1,6 @@
 ---
 name: security-config-review
-description: Reviews infrastructure and configuration files for security misconfigurations across Docker, Kubernetes, CI/CD pipelines, web frameworks, and secrets management.
+description: "Reviews infrastructure and configuration files for security misconfigurations across Docker, Kubernetes, CI/CD pipelines, web frameworks and secrets management. Use to check or harden deployment config."
 trigger: When user asks to review security configuration, check for misconfigurations, harden infrastructure, audit deployment settings, or review config security posture.
 ---
 

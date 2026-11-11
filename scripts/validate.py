@@ -4,7 +4,9 @@
 Checks (errors fail the run, warnings do not unless --strict):
   * every skills/<dir>/SKILL.md has YAML frontmatter with `name` == <dir> and a description
   * relative markdown links in SKILL.md files resolve (warning for vendored reference files)
-  * team/roster.json only references skills that exist, and every skill is owned by someone
+  * team/roster.json only references skills that exist, and every skill is owned by someone;
+    every member has a domain, a model class and routing triggers
+  * the lifecycle and the team size written in the rules, the README and team-orchestration match the roster
   * JSON files parse, plugin.json files have the required keys
   * the install scripts and README skill count agree with the real number of skills
   * token budgets: always-on rules, total skill descriptions, per-description and per-SKILL.md size
@@ -28,12 +30,13 @@ FENCE_RE = re.compile(r"```.*?```", re.S)
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 
 # Token budgets (1 token ~ 4 chars). Descriptions and rules are paid on EVERY turn; SKILL.md bodies on activation.
-BUDGET_RULES_TOKENS = 1400        # all plugins/*/rules/AGENTS.md combined (error)
+BUDGET_RULES_TOKENS = 1200        # all plugins/*/rules/AGENTS.md combined (error)
 BUDGET_DESCRIPTIONS_TOKENS = 3900  # sum of all skill frontmatter descriptions (error)
 MAX_DESCRIPTION_CHARS = 520       # one description (error)
 WARN_SKILL_MD_TOKENS = 3500       # one SKILL.md body (warning: split into references/)
 # Authored as a single workflow with their own progressive disclosure in sibling folders; not split mechanically.
 SIZE_EXEMPT = {"system-design-architect", "backend-performance-review"}
+TIERS = ("core", "specialist", "support")
 
 
 def tokens(text: str) -> int:
@@ -196,15 +199,71 @@ def check_roster(skill_names: set[str]) -> dict:
         for k in ("origin", "inspiration", "traits", "voice", "blind_spot"):
             if not p.get(k):
                 err(f"team/roster.json: {m['name']} persona is missing '{k}'")
-    for n in roster.get("lifecycle", []):
-        if n not in names:
-            err(f"team/roster.json: lifecycle references unknown member '{n}'")
+    for m in roster["members"]:
+        if m.get("tier") not in TIERS:
+            err(f"team/roster.json: {m['name']} tier must be one of {sorted(TIERS)}")
+        if not m.get("domain"):
+            err(f"team/roster.json: {m['name']} needs a 'domain' (the huddle counts domains to pick the tier)")
+        if m.get("model_tier") not in {"flash", "pro"}:
+            err(f"team/roster.json: {m['name']} 'model_tier' must be 'flash' or 'pro'")
+        trig = m.get("triggers")
+        if not isinstance(trig, list) or not trig or any(t != t.lower() for t in trig):
+            err(f"team/roster.json: {m['name']} needs lower-case 'triggers' (words that route a request to them)")
+    seen: list[str] = []
+    for wave in lifecycle_waves(roster):
+        for n in wave:
+            if n not in names:
+                err(f"team/roster.json: lifecycle references unknown member '{n}'")
+            if n in seen:
+                err(f"team/roster.json: lifecycle lists '{n}' twice")
+            seen.append(n)
     for s in sorted(skill_names - owned - set(roster.get("shared_skills", []))):
         warn(f"skill '{s}' is not owned by any team member (add it to team/roster.json)")
     for s in roster.get("shared_skills", []):
         if s not in skill_names:
             err(f"team/roster.json: shared skill '{s}' does not exist")
     return roster
+
+
+def lifecycle_waves(roster: dict) -> list[list[str]]:
+    """roster.lifecycle is a list of waves; a bare name is a one-member wave."""
+    return [w if isinstance(w, list) else [w] for w in roster.get("lifecycle", [])]
+
+
+def lifecycle_text(roster: dict) -> str:
+    return " -> ".join(" + ".join(w) for w in lifecycle_waves(roster))
+
+
+def check_consistency(roster: dict) -> None:
+    """Facts that are written in prose must match the roster, the single source of truth."""
+    if not roster:
+        return
+    life = lifecycle_text(roster)
+    for rel in ("plugins/team-kuro/rules/AGENTS.md", "README.md", "skills/team-orchestration/SKILL.md"):
+        f = ROOT / rel
+        if f.exists() and life not in f.read_text(encoding="utf-8"):
+            err(f"{rel}: lifecycle differs from team/roster.json; it must contain exactly: {life}")
+    members = roster["members"]
+    count = {t: sum(1 for m in members if m.get("tier") == t) for t in TIERS}
+    readme = ROOT / "README.md"
+    if readme.exists():
+        text = readme.read_text(encoding="utf-8")
+        for pattern, real, what in ((r"\b(\d+)-agent\b", len(members), "agents"),
+                                    (r"\b(\d+) core\b", count["core"], "core roles"),
+                                    (r"\b(\d+) on-demand specialists\b", count["specialist"], "specialists"),
+                                    (r"\b(\d+) support\b", count["support"], "support roles")):
+            for m in re.finditer(pattern, text):
+                if int(m.group(1)) != real:
+                    err(f"README.md: claims {m.group(1)} {what} but team/roster.json has {real}")
+        for m in members:
+            if f"**{m['name']}**" not in text and f"*{m['name']}*" not in text:
+                err(f"README.md: team table is missing {m['name']}")
+    rules = ROOT / "plugins" / "team-kuro" / "rules" / "AGENTS.md"
+    if rules.exists():
+        text = rules.read_text(encoding="utf-8")
+        for m in members:
+            if m["name"] not in text:
+                err(f"plugins/team-kuro/rules/AGENTS.md: does not mention {m['name']}")
 
 
 def check_json_and_plugins() -> None:
@@ -270,7 +329,7 @@ def build_team_doc(roster: dict) -> str:
     out = ["# Team Kuro roster", "",
            "_Generated by `python scripts/validate.py --write-catalog` from `team/roster.json` - do not edit by hand._", "",
            f"> {roster.get('persona_note', '')}", "",
-           "Lifecycle: " + " -> ".join(roster["lifecycle"]), ""]
+           "Lifecycle (members joined by `+` work in parallel): " + lifecycle_text(roster), ""]
     for tier, label in (("core", "Core roles"), ("specialist", "Specialists (summoned on demand)"),
                         ("support", "Support (continuity and reporting)")):
         out += [f"## {label}", ""]
@@ -285,6 +344,7 @@ def build_team_doc(roster: dict) -> str:
                     f"- **Voice**: {p['voice']}",
                     f"- **Blind spot (peers challenge it)**: {p['blind_spot']}",
                     f"- **Mission**: {m['mission']}",
+                    f"- **Domain / model class**: {m.get('domain', '-')} / {m.get('model_tier', '-')}",
                     f"- **Skills**: {', '.join('`' + s + '`' for s in m['skills'])}"
                     + (f" (optional: {', '.join('`' + s + '`' for s in m['optional_skills'])})" if m.get("optional_skills") else ""),
                     f"- **Deliverable**: {m['deliverable']}",
@@ -317,6 +377,7 @@ def main() -> int:
     check_links()
     roster = check_roster(set(meta))
     check_json_and_plugins()
+    check_consistency(roster)
     check_team_config_and_hook()
     check_counts(len(meta))
     check_budgets(meta, args.report)

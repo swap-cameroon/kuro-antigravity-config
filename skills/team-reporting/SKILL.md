@@ -17,10 +17,19 @@ Ledger tool: `python <TEAM>/tools/kuro_ledger.py --root <project> <command>` whe
 2. Turn the plan into tasks: `add --id T-001 --title "..." --owner <role> --deps T-000 --acceptance "..." --files a,b --size S|M|L --portable yes|no --skills s1,s2`.
    - **Portable = yes** only if the task is self-contained: bounded files, testable acceptance criteria, no live multi-agent debate, no interactive secrets. Otherwise `--portable no --needs subagents|secrets|browser`.
    - Small tasks (an hour or less), one owner per file area, explicit dependencies.
-3. Tell the user where to look: `.kuro/STATUS.md` (dashboard) and `.kuro/JOURNAL.md` (timeline).
+   - **Always list `--files`**: it is what lets the ledger run tasks in parallel safely.
+3. Tell the user how to follow the work live, in a second terminal: `python <TEAM>/tools/kuro_ledger.py --root <project> watch` (who is doing what, for how long, last heartbeat, blocked, next, journal tail). Files: `.kuro/STATUS.md` (dashboard) and `.kuro/JOURNAL.md` (timeline).
+
+## Parallel work (one owner per file, visible to the user)
+1. `next --parallel` lists the runnable tasks that share no file with each other or with work in progress, with owner and model class. Launch that whole batch at once.
+2. Each agent takes its task with `claim T-001 --agent <name>`. The ledger refuses if another agent holds it or if a running task touches the same files, so two agents never edit one file.
+3. While working: `log "<step, progress>" --level heartbeat --task T-001 --agent <name>` at each step; the live board shows it.
+4. When verified: `set T-001 done --agent <name> --note "result" --commit <sha>`; then run `next --parallel` again for the next batch.
+
+State files have one job each: `.kuro/` is the live task state (minutes), `PROJECT_STATE.md` is the durable handover (milestones, decisions, run commands). Do not copy task lists into `PROJECT_STATE.md`; link to `.kuro/STATUS.md`.
 
 ## Write-ahead rule (what makes it crash-proof)
-- **Before** starting a task: `set T-001 in_progress --note "intent / where I will start"`.
+- **Before** starting a task: `claim T-001 --agent <name> --note "intent / where I will start"` (or `set T-001 in_progress`).
 - **After** finishing: `set T-001 done --note "result" --commit <sha>` (run only after tests were really executed).
 - Any task left `in_progress` after a crash has a note saying where it started; the next session verifies the repo state before trusting it.
 - Decisions, blockers, gate results, errors: `log "<fact>" --level decision|blocker|error|milestone`. Facts only, what really happened.
@@ -30,7 +39,7 @@ Ledger tool: `python <TEAM>/tools/kuro_ledger.py --root <project> <command>` whe
 Notify on: milestone reached, gate passed/failed, decision needed from the user, blocked, error, quota risk, task done. Do **not** notify per tool call.
 
 ## Long-running work
-- Heartbeat: `log "<what is running, progress, ETA if known>" --level heartbeat` at each task boundary and at least every ~15 tool calls or ~10 minutes of wall-clock work.
+- Heartbeat: `log "<what is running, progress, ETA if known>" --level heartbeat --task <id>` at each task boundary and at least every ~15 tool calls or ~10 minutes of wall-clock work.
 - Run long commands in the background with a log file and poll it; report the outcome, not the wait.
 - A bulletin to the user is 4 lines: **done** since last bulletin, **now**, **next**, **blocked/needs you**.
 
