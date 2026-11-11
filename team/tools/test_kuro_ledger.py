@@ -134,6 +134,47 @@ class LedgerTests(unittest.TestCase):
         ids = sorted(t["id"] for t in tasks(self.root))
         self.assertEqual(ids, sorted(f"C-{i}" for i in range(8)))
 
+    def test_claim_is_exclusive_and_records_agent(self):
+        self.add("T-1", "a")
+        kl(self.root, "claim", "T-1", "--agent", "Kamdem")
+        t = tasks(self.root)[0]
+        self.assertEqual((t["status"], t["agent"]), ("in_progress", "Kamdem"))
+        self.assertTrue(t["started"])
+        r = kl(self.root, "claim", "T-1", "--agent", "Ondoua", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("already held by Kamdem", r.stdout + r.stderr)
+        kl(self.root, "claim", "T-1", "--agent", "Kamdem")            # re-claim by the holder is fine
+
+    def test_file_overlap_blocks_parallel_start(self):
+        self.add("T-1", "a", files="x.py")
+        self.add("T-2", "b", files="x.py,y.py")
+        self.add("T-3", "c", files="z.py")
+        batch = kl(self.root, "next", "--parallel").stdout
+        self.assertIn("T-1", batch)
+        self.assertIn("T-3", batch)
+        self.assertNotIn("T-2", batch)
+        kl(self.root, "claim", "T-1", "--agent", "Kamdem")
+        r = kl(self.root, "claim", "T-2", "--agent", "Ondoua", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("shares files with in-progress T-1", r.stdout + r.stderr)
+        r = kl(self.root, "set", "T-2", "in_progress", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        kl(self.root, "claim", "T-3", "--agent", "Kouam")              # disjoint files: allowed in parallel
+        kl(self.root, "set", "T-1", "done")
+        kl(self.root, "claim", "T-2", "--agent", "Ondoua")             # free once T-1 is done
+
+    def test_watch_board_shows_who_does_what(self):
+        self.add("T-1", "build schema", files="x.py")
+        self.add("T-2", "write docs")
+        kl(self.root, "claim", "T-1", "--agent", "Kamdem")
+        kl(self.root, "log", "step 2/5", "--level", "heartbeat", "--task", "T-1", "--agent", "Kamdem")
+        out = kl(self.root, "watch", "--once").stdout
+        for needle in ("0/2 done", "Kamdem", "T-1", "build schema", "step 2/5", "T-2", "JOURNAL"):
+            self.assertIn(needle, out)
+        status = (Path(self.root) / ".kuro" / "STATUS.md").read_text(encoding="utf-8")
+        self.assertIn("Kamdem since", status)
+        self.assertIn("Parallel batch", status)
+
     def test_requires_init(self):
         with tempfile.TemporaryDirectory() as empty:
             r = kl(empty, "next", check=False)

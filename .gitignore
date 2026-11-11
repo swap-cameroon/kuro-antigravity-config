@@ -10,7 +10,7 @@ __pycache__/
 *.pyc
 
 # Machine-specific Antigravity settings must never be committed
-config.json
+/config.json
 hooks.json.bak
 .kuro-backup/
 

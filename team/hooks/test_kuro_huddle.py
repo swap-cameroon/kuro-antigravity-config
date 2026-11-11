@@ -131,6 +131,44 @@ class HuddleTests(unittest.TestCase):
                                capture_output=True, text=True, env=env, encoding="utf-8")
             self.assertTrue(json.loads(r.stdout).get("injectSteps"))
 
+    def test_small_edits_and_explanations_are_trivial_without_subagents(self):
+        for p in ("renomme la variable x en total dans utils.py",
+                  "corrige la faute de frappe dans le README",
+                  "explique moi ce que fait cette fonction " + "mot " * 80):      # length alone is not a feature
+            m = message(run_hook([p], {"KURO_CONCERTATION": "always"}))
+            self.assertIn("tier=TRIVIAL", m, p[:40])
+            self.assertIn("no subagents", m)
+            self.assertNotIn("COVERAGE GAP", m)
+
+    def test_auto_mode_is_default_and_silent_on_trivial(self):
+        self.assertEqual(run_hook(["bonjour", "renomme la variable x en total dans utils.py"]), {})
+
+    def test_debugging_routes_to_matip_not_a_gap(self):
+        m = message(run_hook(["pourquoi ce test échoue ? NullPointerException in UserService.java line 42"]))
+        self.assertIn("tier=FOCUSED", m)
+        self.assertIn("Matip", m)
+        self.assertIn("systematic-debugging", m)
+        self.assertNotIn("COVERAGE GAP", m)
+
+    def test_single_domain_request_has_one_owner(self):
+        m = message(run_hook(["ajoute un endpoint REST de reservation avec Spring et Postgres"]))
+        self.assertIn("tier=FOCUSED", m)
+        self.assertIn("Owners: Kamdem", m)
+        for stranger in ("Ondoua", "Manga"):
+            self.assertNotIn(stranger, m)
+
+    def test_feature_gives_parallel_waves_from_roster(self):
+        m = message(run_hook(["cree une application de reservation full-stack avec frontend Angular, "
+                              "backend Spring, auth JWT et deploiement"]))
+        self.assertIn("tier=FEATURE", m)
+        self.assertIn("Hayatou+Lukong+Ayuk", m)        # review gates run together
+        self.assertIn("next --parallel", m)
+        self.assertIn("watch", m)
+
+    def test_model_class_is_suggested(self):
+        m = message(run_hook(["prepare la release 2.1 avec le changelog"]))
+        self.assertIn("Ndumbe (flash)", m)
+
     def test_output_is_short(self):
         m = message(run_hook(["ajouter JWT a une API Spring Boot"]))
         self.assertLess(len(m) // 4, 260, "huddle message must stay cheap (<260 tokens)")

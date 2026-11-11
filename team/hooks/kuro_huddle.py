@@ -9,7 +9,14 @@ Hook protocol (same as token-saver's interceptor):
   stdin : JSON with "transcriptPath"
   stdout: {"injectSteps": [{"ephemeralMessage": "..."}]}   or   {}
 
-Config: team/config.json  ->  "concertation": "always" | "auto" | "off"  (env KURO_CONCERTATION overrides)
+Tiers (smallest safe workflow wins):
+  SOLO     chit-chat                      -> answer directly
+  TRIVIAL  rename, typo, explain, lookup  -> do it yourself, no subagents
+  FOCUSED  one or two domains             -> the owning role does it, cross-review only where it matters
+  FEATURE  three or more domains, or a new product -> wave plan from roster.lifecycle, parallel inside a wave
+
+Config: team/config.json  ->  "concertation": "always" | "auto" | "off"  (env KURO_CONCERTATION overrides;
+default "auto": SOLO and TRIVIAL turns inject nothing after the first turn).
 The hook must never break a session: any error results in {}.
 """
 from __future__ import annotations
@@ -21,6 +28,7 @@ import os
 import re
 import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -34,10 +42,23 @@ le la les un une des du de et ou en dans sur pour avec par au aux est sont ce ce
 mes ton ta tes peux peut veux voudrais faut fais fait faire ajoute ajouter cree creer construis besoin stp svp
 comment quoi que qui quel quelle plus pas ne si se sa son ses leur leurs mais donc car""".split())
 
-FEATURE_WORDS = re.compile(
-    r"\b(projet|project|application|app|plateforme|platform|mvp|from scratch|de zero|architecture|refonte|"
-    r"migration|migrate|syst[eè]me|system|feature|fonctionnalit[eé]|module|produit|product|backend|frontend|"
-    r"full[- ]?stack|pipeline|service|api)\b", re.I)
+# All patterns below run on accent-folded, lower-cased text (see fold()).
+PRODUCT_WORDS = re.compile(
+    r"\b(projet|project|application|app|plateforme|platform|mvp|produit|product|saas|site|systeme|system|"
+    r"full[- ]?stack|fonctionnalite|feature|module)\b")
+BUILD_WORDS = re.compile(
+    r"\b(cree\w*|creat\w*|construi\w*|build\w*|develop\w*|implement\w*|concevoir|concois|lance\w*|"
+    r"from scratch|de zero|nouveau projet|new project|refonte|rewrite|reecri\w*|migr\w+)\b")
+TRIVIAL_WORDS = re.compile(
+    r"\b(typo|faute de frappe|fautes? d.orthographe|orthographe|renomm\w*|rename\w*|reformat\w*|formate\w*|"
+    r"expliqu\w*|explain\w*|c.est quoi|qu.est[- ]ce que|que fait|what is|what does|how does|comment fonctionne|"
+    r"commentaire\w*|traduis\w*|traduction|translate\w*|resume\w*|summari[sz]e\w*|montre\w*|affiche\w*|liste\w*|"
+    r"show me|list the|ou est|ou se trouve|where is)\b")
+
+
+def fold(text: str) -> str:
+    """Lower-case and strip accents so 'sécurité' and 'securite' route the same way."""
+    return "".join(c for c in unicodedata.normalize("NFD", text.lower()) if unicodedata.category(c) != "Mn")
 
 
 def is_subagent_brief(prompt: str, roster: dict) -> bool:
@@ -72,24 +93,27 @@ def load_json(path: Path, default):
         return default
 
 
-SHORT_OK = {"go", "ai", "ui", "ux", "ci", "cd", "db", "qa", "c#", "k8s", "jwt", "sql", "api", "xss", "csp"}
+SHORT_OK = {"go", "ai", "ia", "ui", "ux", "ci", "cd", "db", "qa", "pr", "c#", "k8s", "jwt", "sql", "api", "xss", "csp"}
 
 # Common French dev vocabulary -> the English words used in skill descriptions
 SYN = {
-    "charge": "load", "performance": "performance", "lenteur": "slow", "lent": "slow", "securite": "security",
-    "sécurité": "security", "securise": "security", "sécurisé": "security", "authentification": "authentication",
-    "autorisation": "authorization", "mot": "password", "donnees": "data", "données": "data", "base": "database",
-    "deploiement": "deployment", "déploiement": "deployment", "deployer": "deploy", "déployer": "deploy",
-    "erreur": "error", "bogue": "bug", "plantage": "crash", "documentation": "documentation", "doc": "documentation",
-    "tests": "test", "tester": "test", "revue": "review", "refonte": "refactoring", "migration": "migration",
-    "interface": "ui", "accessibilite": "accessibility", "accessibilité": "accessibility", "mobile": "mobile",
-    "reservation": "booking", "réservation": "booking", "conteneur": "container", "surveillance": "monitoring",
-    "journaux": "logs", "faille": "vulnerability", "vulnerabilite": "vulnerability", "vulnérabilité": "vulnerability",
-    "exigences": "requirements", "besoin": "requirements", "spec": "specification", "architecture": "architecture",
-    "versions": "version", "livraison": "release", "publication": "release", "apprentissage": "learning",
-    "donnee": "data", "pipeline": "pipeline", "stockage": "storage", "cache": "cache", "latence": "latency",
-    "recette": "acceptance uat", "navigateur": "browser", "exploratoire": "exploratory", "bout": "end-to-end e2e",
-    "e2e": "end-to-end e2e", "playwright": "playwright e2e", "ergonomie": "ui usability", "testeur": "test tester",
+    "charge": "load", "lenteur": "slow", "lent": "slow", "lente": "slow", "securite": "security",
+    "securise": "security", "securiser": "security", "authentification": "authentication",
+    "autorisation": "authorization", "donnees": "data", "donnee": "data", "base": "database",
+    "deploiement": "deployment", "deployer": "deploy", "deploie": "deploy", "erreur": "error", "bogue": "bug",
+    "plantage": "crash", "plante": "crash", "echoue": "failing bug", "echec": "failing bug", "casse": "failing bug",
+    "corrige": "fix", "corriger": "fix", "repare": "fix", "debogue": "debugging", "deboguer": "debugging",
+    "doc": "documentation", "tests": "test", "tester": "test", "teste": "test", "revue": "review",
+    "relis": "review", "refonte": "refactoring", "refactorise": "refactoring", "refactoriser": "refactoring",
+    "nettoie": "refactoring", "interface": "ui", "accessibilite": "accessibility", "reservation": "booking",
+    "conteneur": "container", "surveillance": "monitoring", "journaux": "logs", "faille": "vulnerability",
+    "vulnerabilite": "vulnerability", "exigences": "requirements", "besoin": "requirements",
+    "spec": "specification", "versions": "version", "livraison": "release", "publication": "release",
+    "apprentissage": "learning", "stockage": "storage", "latence": "latency", "optimise": "optimization",
+    "optimiser": "optimization", "requete": "query", "requetes": "query", "recette": "acceptance uat",
+    "navigateur": "browser", "exploratoire": "exploratory", "bout": "end-to-end e2e", "e2e": "end-to-end e2e",
+    "playwright": "playwright e2e", "ergonomie": "ui usability", "testeur": "test tester",
+    "jeton": "token", "jetons": "token", "equipe": "team", "avancement": "progress", "reprise": "resume handoff",
 }
 
 
@@ -98,10 +122,10 @@ def stem(w: str) -> str:
 
 
 def tokens(text: str) -> list[str]:
-    words = re.findall(r"[a-zA-Z0-9àâäçéèêëîïôöùûüœ+#.\-]{2,}", text.lower())
+    words = re.findall(r"[a-z0-9+#./\-]{2,}", fold(text))
     out = []
     for w in words:
-        w = w.strip(".-")
+        w = w.strip(".-/")
         if len(w) < 2 or w in STOP:
             continue
         if len(w) == 2 and w not in SHORT_OK and not any(c.isdigit() for c in w):
@@ -136,6 +160,7 @@ def frontmatter(text: str) -> dict[str, str]:
 
 
 def load_skills() -> dict[str, set[str]]:
+    """skill name -> routing tokens (description + name); name tokens are also stored as 'name:<tok>'."""
     skills: dict[str, set[str]] = {}
     if not SKILLS_DIR.exists():
         return skills
@@ -148,8 +173,8 @@ def load_skills() -> dict[str, set[str]]:
         except Exception:
             continue
         name = fm.get("name") or d.name
-        toks = norm_tokens(name.replace("-", " ")) | norm_tokens(fm.get("description", ""))
-        # name tokens are strong signals: also add the bare hyphenated name
+        name_toks = norm_tokens(name.replace("-", " "))
+        toks = name_toks | norm_tokens(fm.get("description", "")) | {"name:" + t for t in name_toks}
         toks.add(name.lower())
         skills[name] = toks
     return skills
@@ -179,91 +204,156 @@ def last_prompt_and_count(transcript: str) -> tuple[str | None, int]:
     return prompt, count
 
 
-def route(prompt: str, skills: dict[str, set[str]], roster: dict):
-    """Return (ranked skills [(name, score)], participants [member names], gap bool)."""
+NAME_BONUS = 1.5     # a prompt word that is part of a skill's name is a stronger signal than its description
+
+
+def match_members(prompt: str, roster: dict) -> list[tuple[str, int]]:
+    """Members whose roster `triggers` appear in the prompt, best match first: [(name, hits)]."""
     ptoks = norm_tokens(prompt)
-    # also match hyphenated skill names written verbatim, e.g. "spring-security"
-    low = prompt.lower()
+    low = " " + re.sub(r"\s+", " ", fold(prompt)) + " "
+    hits: list[tuple[str, int]] = []
+    for m in roster.get("members", []):
+        n = 0
+        for t in m.get("triggers", []):
+            t = fold(t)
+            if " " in t:
+                n += 1 if f" {t}" in low else 0
+            elif stem(t) in ptoks:
+                n += 1
+        if n:
+            hits.append((m["name"], n))
+    hits.sort(key=lambda x: -x[1])
+    return hits
+
+
+def route(prompt: str, skills: dict[str, set[str]], roster: dict):
+    """Return (skills [(name, score)], participants [names], domains {str}, gap bool)."""
+    ptoks = norm_tokens(prompt)
+    low = fold(prompt)
     df: dict[str, int] = {}
     for toks in skills.values():
         for t in toks:
             df[t] = df.get(t, 0) + 1
     n = max(len(skills), 1)
-    scores = []
+    all_scores: dict[str, float] = {}
     for name, toks in skills.items():
-        s = 0.0
+        sc = 0.0
         for t in ptoks & toks:
-            s += math.log(1 + n / df[t])
+            sc += math.log(1 + n / df[t])
+            if "name:" + t in toks:
+                sc += NAME_BONUS
         if name in low:
-            s += 6.0
-        if s > 0:
-            scores.append((name, s))
-    scores.sort(key=lambda x: -x[1])
-    best = scores[0][1] if scores else 0.0
-    top = [(n_, s) for n_, s in scores if s >= 3.0 and s >= 0.5 * best][:4]   # drop weak, noisy matches
+            sc += 6.0
+        if sc > 0:
+            all_scores[name] = sc
+    ranked = sorted(all_scores.items(), key=lambda x: -x[1])
+    best = ranked[0][1] if ranked else 0.0
+    top = [(n_, sc) for n_, sc in ranked if sc >= 3.0 and sc >= 0.5 * best][:4]   # drop weak, noisy matches
+
+    members = {m["name"]: m for m in roster.get("members", [])}
     primary: dict[str, list[str]] = {}
     optional: dict[str, list[str]] = {}
-    for m in roster.get("members", []):
+    for m in members.values():
         for sk in m.get("skills", []):
             primary.setdefault(sk, []).append(m["name"])
         for sk in m.get("optional_skills", []):
             optional.setdefault(sk, []).append(m["name"])
-    core: list[str] = []          # members who primarily own a matched skill
-    people: list[str] = []        # core first, then optional owners
-    for name, _ in top:
-        for o in primary.get(name, []):
-            if o not in core:
-                core.append(o)
-    people.extend(core)
-    for name, _ in top:
-        for o in optional.get(name, []):
-            if o not in people:
-                people.append(o)
-    gap = not top and len(tokens(prompt)) >= 3     # technical-looking request nothing installed covers
-    return top, people, core, gap
+
+    triggered = [name for name, _ in match_members(prompt, roster)]
+    shared = set(roster.get("shared_skills", []))
+    if triggered:
+        # Explicit intent wins: keep only playbooks these members own, so a stray word ("test", "page")
+        # cannot pull in an unrelated skill or a third domain.
+        people = list(triggered)
+        mine = {sk for w in people for sk in members[w].get("skills", []) + members[w].get("optional_skills", [])}
+        top = [(n_, sc) for n_, sc in top if n_ in mine or n_ in shared]
+    else:
+        people = []
+        for name, _ in top:                                  # primary owners of matched skills
+            for o in primary.get(name, []):
+                if o not in people:
+                    people.append(o)
+        if not people:                                       # optional owners only as a last resort
+            for name, _ in top:
+                for o in optional.get(name, []):
+                    if o not in people:
+                        people.append(o)
+
+    # A triggered member with no matched skill still brings their best playbook (e.g. Matip -> systematic-debugging).
+    names = [n_ for n_, _ in top]
+    for who in triggered[:2]:
+        own = members[who].get("skills", [])
+        if own and not any(sk in names for sk in own) and len(names) < 4:
+            names.append(max(own, key=lambda sk: all_scores.get(sk, 0.0)))
+    top = [(n_, all_scores.get(n_, 0.0)) for n_ in names]
+
+    domains = {members[p].get("domain", p) for p in people if p in members}
+    gap = not top and not people and len(tokens(prompt)) >= 3   # nothing installed and nobody on the team covers it
+    return top, people, domains, gap
 
 
-def tier_for(prompt: str, top, core) -> str:
-    words = len(prompt.split())
-    feature_hits = len(FEATURE_WORDS.findall(prompt))
+def tier_for(prompt: str, top, people, domains) -> str:
+    low = fold(prompt)
     content = len(tokens(prompt))          # meaningful words left after stop-word removal
-    if not top and feature_hits == 0 and content <= 2:
+    product = bool(PRODUCT_WORDS.search(low))
+    build = bool(BUILD_WORDS.search(low))
+    if not top and not people and not product and content <= 2:
         return "SOLO"                       # chit-chat, thanks, one-word follow-ups
-    if len(core) >= 4 or words > 70 or (feature_hits >= 2 and len(core) >= 2):
-        return "FEATURE"
-    return "FOCUSED"                        # technical request: consult, even if no skill matched
+    if len(domains) >= 3 or (build and product and len(domains) >= 2):
+        return "FEATURE"                    # breadth, not prompt length, is what makes a feature
+    if TRIVIAL_WORDS.search(low) and not build and len(domains) <= 1:
+        return "TRIVIAL"                    # rename, typo, explanation, lookup: never worth a subagent
+    return "FOCUSED"
 
 
-def build_message(mode: str, first: bool, prompt: str, tier: str, top, people, gap: bool, cfg: dict) -> str:
+def waves(roster: dict) -> str:
+    """'Ngono > Njoya > Kouam+Kamdem > ...' from roster.lifecycle (a list of waves; a bare name is a 1-member wave)."""
+    out = []
+    for w in roster.get("lifecycle", []):
+        out.append("+".join(w) if isinstance(w, list) else str(w))
+    return " > ".join(out)
+
+
+def build_message(mode: str, first: bool, tier: str, top, people, gap: bool, cfg: dict, roster: dict) -> str:
     lines = [f"[TEAM KURO HUDDLE | mode={mode} | tier={tier}]"]
     if first:
         lines.append("SESSION START: load team/roster.json; read PROJECT_STATE.md if present (skill project-state) "
                      "and greet in 2 lines; keep subagents lazy (spawn on first need, then reuse via manage_subagents).")
     maxp = int(cfg.get("max_participants", 4))
+    models = {m["name"]: m.get("model_tier", "") for m in roster.get("members", [])}
+    ledger = (TEAM_DIR / "tools" / "kuro_ledger.py").as_posix()
     if top:
-        lines.append("Candidate skills: " + ", ".join(f"{n}" for n, _ in top))
+        lines.append("Candidate skills: " + ", ".join(n for n, _ in top))
     if people and tier != "SOLO":
-        lines.append("Suggested participants: " + ", ".join(people[:maxp])
-                     + (" (+ Njoya to arbitrate; Hayatou/Lukong gates if code changes; Ayuk E2E and Tchinda UAT if user-facing)" if tier == "FEATURE" else ""))
+        label = "Suggested participants" if tier == "FEATURE" else "Owner" if tier == "TRIVIAL" else "Owners"
+        shown = people[:1] if tier == "TRIVIAL" else people[:min(2, maxp)] if tier == "FOCUSED" else people[:maxp]
+        lines.append(f"{label}: " + ", ".join(f"{p} ({models[p]})" if models.get(p) and tier != "TRIVIAL" else p
+                                              for p in shown))
     rounds = int(cfg.get("max_rounds", 2))
     if tier == "SOLO":
-        lines.append("SOLO: answer directly after a quick self-check by the most relevant role; no subagents.")
+        lines.append("SOLO: answer directly; no subagents.")
+    elif tier == "TRIVIAL":
+        lines.append("TRIVIAL: do it yourself in the owner's voice; no subagents, no debate. "
+                     "Read a candidate skill only if a domain rule applies.")
     elif tier == "FOCUSED":
-        lines.append("FOCUSED: consult the 1-2 relevant roles (real subagents, blind positions, one exchange round); "
-                     "answer with their input and name who contributed.")
+        lines.append("FOCUSED: the owning role does the work (one subagent only if it saves context; 2 owners with "
+                     "disjoint files run in parallel). No debate unless a real design choice appears. "
+                     "Cross-review by Hayatou or Lukong only if auth, data or a public API changes.")
+        lines.append(f'LIVE: if you delegate, `python "{ledger}" --root <project> claim|set` each task so the user '
+                     "can follow with `watch`.")
     else:
-        lines.append(f"FEATURE: full concertation per skill team-orchestration (briefs = question not answer; blind round, "
-                     f"exchange, max {rounds} rounds; Njoya decides + ADR; gates; real-message log only).")
-    if gap and tier != "SOLO":
-        lines.append("COVERAGE GAP: no installed skill matches well. Follow team-orchestration/references/"
-                     "capability-acquisition.md (acquire a vetted skill, or author one, or create a specialist agent) "
-                     f"- skill_acquisition={cfg.get('skill_acquisition', 'ask')}, agent_creation={cfg.get('agent_creation', 'ask')}.")
-    if tier == "FEATURE" and cfg.get("reporter", {}).get("enabled", True):
-        ledger = (TEAM_DIR / "tools" / "kuro_ledger.py").as_posix()
-        lines.append(f'REPORTER: Mbarga keeps the ledger (skill team-reporting; python "{ledger}" --root <project>): '
-                     "plan tasks BEFORE work, set in_progress/done write-ahead, log milestones, notify; "
-                     "prepare handoff packets if quota is at risk.")
-    lines.append("Protocol details: skills/team-orchestration/references/concertation.md. Persona = tone only; be honest about what was run.")
+        lines.append(f"FEATURE: skill team-orchestration. Waves (parallel inside a wave, '+'): {waves(roster)}. "
+                     f"Specialists join the build wave. Briefs = question not answer; debate only real design choices "
+                     f"(blind round, max {rounds} rounds, Njoya decides + ADR).")
+        if cfg.get("reporter", {}).get("enabled", True):
+            lines.append(f'REPORTER: Mbarga keeps the ledger (skill team-reporting; python "{ledger}" --root <project>): '
+                         "plan tasks with files BEFORE work, `next --parallel` gives the batch to launch together, "
+                         "each agent `claim`s then `set done`; tell the user to run `watch` for the live board.")
+    if gap and tier in ("FOCUSED", "FEATURE"):
+        lines.append("COVERAGE GAP: no skill or team member matches. Follow team-orchestration/references/"
+                     "capability-acquisition.md "
+                     f"(skill_acquisition={cfg.get('skill_acquisition', 'ask')}, agent_creation={cfg.get('agent_creation', 'ask')}).")
+    lines.append("Persona = tone only; be honest about what was run. The hint can be wrong: judgement wins.")
     return "\n".join(lines)
 
 
@@ -272,7 +362,7 @@ def main() -> None:
         raw = sys.stdin.read() if not sys.stdin.isatty() else ""
         transcript = json.loads(raw).get("transcriptPath") if raw else None
         cfg = load_json(TEAM_DIR / "config.json", {})
-        mode = (os.environ.get("KURO_CONCERTATION") or cfg.get("concertation") or "always").lower()
+        mode = (os.environ.get("KURO_CONCERTATION") or cfg.get("concertation") or "auto").lower()
         if mode == "off" or not transcript:
             print("{}")
             return
@@ -285,12 +375,12 @@ def main() -> None:
             print("{}")
             return
         skills = load_skills()
-        top, people, core, gap = route(prompt, skills, roster)
-        tier = tier_for(prompt, top, core)
-        if mode == "auto" and tier == "SOLO" and count > 1:
-            print("{}")
+        top, people, domains, gap = route(prompt, skills, roster)
+        tier = tier_for(prompt, top, people, domains)
+        if mode == "auto" and tier in ("SOLO", "TRIVIAL") and count > 1:
+            print("{}")                      # nothing useful to add: spend zero tokens
             return
-        msg = build_message(mode, count == 1, prompt, tier, top, people, gap, cfg)
+        msg = build_message(mode, count == 1, tier, top, people, gap, cfg, roster)
         print(json.dumps({"injectSteps": [{"ephemeralMessage": msg}]}, ensure_ascii=False))
     except Exception:
         print("{}")

@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: "Orchestrator for comprehensive security audits: auto-detects the stack, runs the applicable scanning skills and produces one unified report with remediation. Use for 'security audit', 'full security scan', 'comprehensive vulnerability assessment', 'run all security checks', or any broad multi-dimensional security review."
+description: "Orchestrator for a full multi-scanner security audit of a whole project: auto-detects the stack, runs SAST, DAST, dependency and config scanning skills and merges one report with remediation. Use for 'full security scan', 'run all security checks', 'comprehensive vulnerability assessment'. For one feature or diff use security-auditor."
 metadata:
   version: "1.0.0"
   domain: application-security
